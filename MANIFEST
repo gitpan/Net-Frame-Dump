@@ -1,0 +1,14 @@
+Changes
+examples/dump-offline.pl
+examples/dump-online.pl
+examples/dump-writer.pl
+lib/Net/Frame/Dump.pm
+LICENSE
+LICENSE.Artistic
+Makefile.PL
+MANIFEST
+META.yml
+README
+t/01-use.t
+t/02-pod-coverage.t
+t/03-test-pod.t
