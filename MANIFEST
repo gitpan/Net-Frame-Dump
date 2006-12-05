@@ -1,12 +1,16 @@
 Changes
 examples/dump-offline.pl
+examples/dump-online-1-frame.pl
 examples/dump-online.pl
 examples/dump-writer.pl
+lib/Net/Frame/Dump/Offline.pm
+lib/Net/Frame/Dump/Online.pm
 lib/Net/Frame/Dump.pm
+lib/Net/Frame/Dump/Writer.pm
 LICENSE
 LICENSE.Artistic
 Makefile.PL
-MANIFEST
+MANIFEST			This list of files
 META.yml
 README
 t/01-use.t

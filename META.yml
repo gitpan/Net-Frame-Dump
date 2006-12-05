@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:                Net-Frame-Dump
-version:             1.00_01
-abstract:            tcpdump like implementation
+version:             1.00_02
+abstract:            tcpdump like implementation, base class only
 license:             Artistic
 generated_by:        ExtUtils::MakeMaker version 6.31
 distribution_type:   module

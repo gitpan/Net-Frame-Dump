@@ -6,4 +6,7 @@ if ($@) {
 }
 else {
    pod_coverage_ok("Net::Frame::Dump");
+   pod_coverage_ok("Net::Frame::Dump::Online");
+   pod_coverage_ok("Net::Frame::Dump::Offline");
+   pod_coverage_ok("Net::Frame::Dump::Writer");
 }

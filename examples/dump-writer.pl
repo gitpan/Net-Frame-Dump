@@ -3,18 +3,15 @@ use strict;
 use warnings;
 
 use Net::Frame::IPv4;
-use Net::Frame::Dump qw(:consts);
+use Net::Frame::Dump::Writer;
 use Net::Frame::Simple;
 
-my $d = Net::Frame::Dump->new(
-   dev  => 'non',
-   mode => NP_DUMP_MODE_WRITER,
-   file => 'new-file.pcap',
-   overwrite     => 0,
-   unlinkOnClean => 0,
+my $oDump = Net::Frame::Dump::Writer->new(
+   file      => 'new-file.pcap',
+   overwrite => 1,
 );
 
-$d->start;
+$oDump->start;
 
 for (0..255) {
    my $ip = Net::Frame::IPv4->new(
@@ -23,8 +20,7 @@ for (0..255) {
    );
    $ip->pack;
    my $raw = pack('H*', 'f'x1000);
-   $d->write({ timestamp => '10.10', raw => $ip->raw.$raw });
+   $oDump->write({ timestamp => '10.10', raw => $ip->raw.$raw });
 }
 
-$d->stop;
-$d->clean;
+END { $oDump && $oDump->isRunning && $oDump->stop }

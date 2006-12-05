@@ -24,6 +24,7 @@ while (1) {
       my $len = length($h->{raw});
       print 'o Frame number: '.$count++." (length: $len)\n";
       print $f->print."\n";
+      last;
    }
 }
 
