@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm,v 1.4 2006/12/05 20:28:07 gomor Exp $
+# $Id: Dump.pm,v 1.5 2006/12/06 21:14:38 gomor Exp $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.00_02';
+our $VERSION = '1.00_03';
 
 require Class::Gomor::Array;
 require Exporter;
@@ -37,7 +37,7 @@ our @AS = qw(
    link
    isRunning
    keepTimestamp
-   framesStored
+   _framesStored
    _pcapd
    _dumper
 );
@@ -56,12 +56,12 @@ use Net::Frame::Utils qw(getRandom32bitsInt);
 sub new {
    my $int = getRandom32bitsInt();
    shift->SUPER::new(
-      file         => "netframe-tmp-$$.$int.pcap",
-      filter       => '',
-      overwrite    => 0,
-      isRunning    => 0,
-      framesStored => {},
-      frames       => [],
+      file          => "netframe-tmp-$$.$int.pcap",
+      filter        => '',
+      overwrite     => 0,
+      isRunning     => 0,
+      frames        => [],
+      _framesStored => {},
       @_,
    );
 }
@@ -69,7 +69,7 @@ sub new {
 sub _dumpFlush {
    my $self = shift;
    $self->frames([]);
-   $self->framesStored({});
+   $self->_framesStored({});
 }
 
 sub _dumpStore {
@@ -126,12 +126,12 @@ sub _dumpGetFramesFor {
 
    my $results;
    my $key = $oSimple->getKeyReverse;
-   push @$results, @{$self->framesStored->{$key}}
-      if exists $self->framesStored->{$key};
+   push @$results, @{$self->_framesStored->{$key}}
+      if exists $self->_framesStored->{$key};
 
    # Add also ICMPv4
-   if (exists $self->framesStored->{ICMPv4}) {
-      push @$results, @{$self->framesStored->{ICMPv4}};
+   if (exists $self->_framesStored->{ICMPv4}) {
+      push @$results, @{$self->_framesStored->{ICMPv4}};
    }
 
    $results ? @$results : ();
@@ -144,17 +144,17 @@ sub _dumpFramesStored {
    # If parameter, we store it
    if ($oSimple) {
       my $key = $oSimple->getKey;
-      push @{$self->framesStored->{$key}}, $oSimple;
+      push @{$self->_framesStored->{$key}}, $oSimple;
 
       # If it is ICMPv4, we store a second time
       if (exists $oSimple->ref->{ICMPv4}) {
-         push @{$self->framesStored->{$oSimple->ref->{ICMPv4}->getKey}},
+         push @{$self->_framesStored->{$oSimple->ref->{ICMPv4}->getKey}},
             $oSimple;
       }
    }
 
    # We return the hash ref
-   $self->framesStored;
+   $self->_framesStored;
 }
 
 1;
@@ -178,6 +178,8 @@ Net::Frame::Dump - tcpdump like implementation, base class only
 =head1 METHODS
 
 =over 4
+
+=item B<new>
 
 =back
 

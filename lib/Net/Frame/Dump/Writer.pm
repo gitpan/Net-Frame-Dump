@@ -1,5 +1,5 @@
 #
-# $Id: Writer.pm,v 1.2 2006/12/05 20:32:11 gomor Exp $
+# $Id: Writer.pm,v 1.3 2006/12/06 21:15:48 gomor Exp $
 #
 package Net::Frame::Dump::Writer;
 use strict;
@@ -125,6 +125,14 @@ Net::Frame::Dump::Writer - tcpdump like implementation, writer mode
 =head1 METHODS
 
 =over 4
+
+=item B<new>
+
+=item B<start>
+
+=item B<stop>
+
+=item B<write>
 
 =back
 

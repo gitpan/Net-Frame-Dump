@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm,v 1.3 2006/12/05 20:29:29 gomor Exp $
+# $Id: Offline.pm,v 1.4 2006/12/06 21:15:12 gomor Exp $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -83,7 +83,6 @@ sub next { shift->_dumpPcapNext(@_) }
 
 sub nextAll { print "XXX: Dump::nextAll: broken, next() does not return Simple objects anymore\n" }
 
-sub framesStored { shift->_dumpFramesStored(@_) }
 sub getFramesFor { shift->_dumpGetFramesFor(@_) }
 sub store        { shift->_dumpStore(@_)        }
 sub flush        { shift->_dumpFlush(@_)        }
@@ -109,6 +108,22 @@ Net::Frame::Dump - tcpdump like implementation
 =head1 METHODS
 
 =over 4
+
+=item B<new>
+
+=item B<start>
+
+=item B<stop>
+
+=item B<getFramesFor>
+
+=item B<next>
+
+=item B<nextAll>
+
+=item B<store>
+
+=item B<flush>
 
 =back
 
