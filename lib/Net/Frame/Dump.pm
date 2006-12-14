@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm,v 1.5 2006/12/06 21:14:38 gomor Exp $
+# $Id: Dump.pm,v 1.6 2006/12/14 17:49:33 gomor Exp $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.00_03';
+our $VERSION = '1.00_04';
 
 require Class::Gomor::Array;
 require Exporter;
@@ -13,28 +13,28 @@ our @ISA = qw(Class::Gomor::Array Exporter);
 
 our %EXPORT_TAGS = (
    consts => [qw(
-      NP_DUMP_LINK_NULL
-      NP_DUMP_LINK_ETH
-      NP_DUMP_LINK_RAW
-      NP_DUMP_LINK_SLL
-      NP_DUMP_LINK_PPP
+      NF_DUMP_LAYER_NULL
+      NF_DUMP_LAYER_ETH
+      NF_DUMP_LAYER_RAW
+      NF_DUMP_LAYER_SLL
+      NF_DUMP_LAYER_PPP
    )],
 );
 our @EXPORT_OK = (
    @{$EXPORT_TAGS{consts}},
 );
 
-use constant NP_DUMP_LINK_NULL    => 0;
-use constant NP_DUMP_LINK_ETH     => 1;
-use constant NP_DUMP_LINK_PPP     => 9;
-use constant NP_DUMP_LINK_RAW     => 12;
-use constant NP_DUMP_LINK_SLL     => 113;
+use constant NF_DUMP_LAYER_NULL    => 0;
+use constant NF_DUMP_LAYER_ETH     => 1;
+use constant NF_DUMP_LAYER_PPP     => 9;
+use constant NF_DUMP_LAYER_RAW     => 12;
+use constant NF_DUMP_LAYER_SLL     => 113;
 
 our @AS = qw(
    file
    filter
    overwrite
-   link
+   firstLayer
    isRunning
    keepTimestamp
    _framesStored
@@ -51,7 +51,7 @@ __PACKAGE__->cgBuildAccessorsArray(\@AA);
 use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
-use Net::Frame::Utils qw(getRandom32bitsInt);
+use Net::Frame::Layer qw(:consts :subs);
 
 sub new {
    my $int = getRandom32bitsInt();
@@ -96,11 +96,11 @@ sub _setTimestamp {
 }
 
 my $mapLinks = {
-   NP_DUMP_LINK_NULL() => 'NULL',
-   NP_DUMP_LINK_ETH()  => 'ETH',
-   NP_DUMP_LINK_RAW()  => 'RAW',
-   NP_DUMP_LINK_SLL()  => 'SLL',
-   NP_DUMP_LINK_PPP()  => 'PPP',
+   NF_DUMP_LAYER_NULL() => 'NULL',
+   NF_DUMP_LAYER_ETH()  => 'ETH',
+   NF_DUMP_LAYER_RAW()  => 'RAW',
+   NF_DUMP_LAYER_SLL()  => 'SLL',
+   NF_DUMP_LAYER_PPP()  => 'PPP',
 };
 
 sub _dumpPcapNext {
@@ -111,7 +111,7 @@ sub _dumpPcapNext {
       my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
                                     : $self->_setTimestamp;
       return {
-         firstLayer => $mapLinks->{$self->link} || 'UNKNOWN',
+         firstLayer => $mapLinks->{$self->firstLayer} || NF_LAYER_UNKNOWN,
          timestamp  => $ts,
          raw        => $raw,
       };
@@ -163,31 +163,37 @@ __END__
 
 =head1 NAME
 
-Net::Frame::Dump - tcpdump like implementation, base class only
-
-=head1 SYNOPSIS
+Net::Frame::Dump - tcpdump like implementation
 
 =head1 DESCRIPTION
 
-=head1 ATTRIBUTES
+B<Net::Frame::Dump> is the base class for all dump modules. With them, you can open a device for live capture, for offline analyzing, or for creating a pcap file.
 
-=over 4
-
-=back
-
-=head1 METHODS
-
-=over 4
-
-=item B<new>
-
-=back
+See B<Net::Frame::Dump::Offline>, B<Net::Frame::Dump::Online>, B<Net::Frame::Dump::Writer> for specific usage.
 
 =head1 CONSTANTS
 
+Load them: use Net::Frame::Dump qw(:consts);
+
 =over 4
 
+=item B<NF_DUMP_LAYER_NULL>
+
+=item B<NF_DUMP_LAYER_ETH>
+
+=item B<NF_DUMP_LAYER_RAW>
+
+=item B<NF_DUMP_LAYER_SLL>
+
+=item B<NF_DUMP_LAYER_PPP>
+
+Various supported link layers.
+
 =back
+
+=head1 SEE ALSO
+
+L<Net::Frame::Dump::Online>, L<Net::Frame::Dump::Offline>, L<Net::Frame::Dump::Writer>
 
 =head1 AUTHOR
 

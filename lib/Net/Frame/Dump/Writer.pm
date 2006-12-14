@@ -1,5 +1,5 @@
 #
-# $Id: Writer.pm,v 1.3 2006/12/06 21:15:48 gomor Exp $
+# $Id: Writer.pm,v 1.4 2006/12/14 17:50:20 gomor Exp $
 #
 package Net::Frame::Dump::Writer;
 use strict;
@@ -16,7 +16,7 @@ use Net::Pcap;
 
 sub new {
    shift->SUPER::new(
-      link => NP_DUMP_LINK_RAW,
+      firstLayer => NF_DUMP_LAYER_RAW,
       @_,
    );
 }
@@ -26,7 +26,7 @@ sub _getPcapHeader {
    # 24 bytes header
    "\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00".
    "\x00\x00\x00\x00\xdc\x05\x00\x00".
-   pack('C', $self->[$__link]).
+   pack('C', $self->[$__firstLayer]).
    "\x00\x00\x00";
 }
 

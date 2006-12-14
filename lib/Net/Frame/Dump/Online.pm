@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm,v 1.3 2006/12/06 21:15:36 gomor Exp $
+# $Id: Online.pm,v 1.4 2006/12/14 17:50:33 gomor Exp $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -37,7 +37,7 @@ use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Storable qw(lock_store lock_retrieve);
-use Net::Frame::Utils qw(getRandom32bitsInt);
+use Net::Frame::Layer qw(:subs);
 
 sub new {
    my $int = getRandom32bitsInt();
@@ -261,7 +261,7 @@ sub _openFile {
             "@{[$self->[$__file]]}: $err\n");
    }
 
-   $self->[$__link] = Net::Pcap::datalink($self->[$___pcapd]);
+   $self->[$__firstLayer] = Net::Pcap::datalink($self->[$___pcapd]);
 }
 
 sub _getNextAwaitingFrame {

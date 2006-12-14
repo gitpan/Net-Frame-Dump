@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm,v 1.4 2006/12/06 21:15:12 gomor Exp $
+# $Id: Offline.pm,v 1.5 2006/12/14 17:50:10 gomor Exp $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -27,7 +27,7 @@ sub _openFile {
             "@{[$self->[$__file]]}: $err\n");
    }
 
-   $self->[$__link] = Net::Pcap::datalink($self->[$___pcapd]);
+   $self->[$__firstLayer] = Net::Pcap::datalink($self->[$___pcapd]);
 }
 
 sub _setFilter {
