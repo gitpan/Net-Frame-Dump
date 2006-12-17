@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Net::Frame::IPv4;
+use Net::Frame::Layer::IPv4;
 use Net::Frame::Dump::Writer;
 use Net::Frame::Simple;
 
@@ -14,7 +14,7 @@ my $oDump = Net::Frame::Dump::Writer->new(
 $oDump->start;
 
 for (0..255) {
-   my $ip = Net::Frame::IPv4->new(
+   my $ip = Net::Frame::Layer::IPv4->new(
       length   => 1480,
       protocol => $_,
    );

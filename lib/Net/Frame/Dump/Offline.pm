@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm,v 1.5 2006/12/14 17:50:10 gomor Exp $
+# $Id: Offline.pm,v 1.6 2006/12/17 16:26:32 gomor Exp $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -93,7 +93,7 @@ __END__
 
 =head1 NAME
 
-Net::Frame::Dump - tcpdump like implementation
+Net::Frame::Dump::Offline - tcpdump like implementation, offline mode
 
 =head1 SYNOPSIS
 
