@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm,v 1.7 2006/12/17 16:26:17 gomor Exp $
+# $Id: Dump.pm,v 1.8 2007/01/08 22:04:01 gomor Exp $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.00_05';
+our $VERSION = '1.00';
 
 require Class::Gomor::Array;
 require Exporter;
@@ -24,11 +24,11 @@ our @EXPORT_OK = (
    @{$EXPORT_TAGS{consts}},
 );
 
-use constant NF_DUMP_LAYER_NULL    => 0;
-use constant NF_DUMP_LAYER_ETH     => 1;
-use constant NF_DUMP_LAYER_PPP     => 9;
-use constant NF_DUMP_LAYER_RAW     => 12;
-use constant NF_DUMP_LAYER_SLL     => 113;
+use constant NF_DUMP_LAYER_NULL => 0;
+use constant NF_DUMP_LAYER_ETH  => 1;
+use constant NF_DUMP_LAYER_PPP  => 9;
+use constant NF_DUMP_LAYER_RAW  => 12;
+use constant NF_DUMP_LAYER_SLL  => 113;
 
 our @AS = qw(
    file
@@ -53,13 +53,14 @@ use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Net::Frame::Layer qw(:consts :subs);
 
-sub new {
+sub _dumpNew {
    my $int = getRandom32bitsInt();
    shift->SUPER::new(
       file          => "netframe-tmp-$$.$int.pcap",
       filter        => '',
       overwrite     => 0,
       isRunning     => 0,
+      keepTimestamp => 0,
       frames        => [],
       _framesStored => {},
       @_,
@@ -103,6 +104,12 @@ my $mapLinks = {
    NF_DUMP_LAYER_PPP()  => 'PPP',
 };
 
+sub _dumpGetFirstLayer {
+   my $self = shift;
+   my $link = Net::Pcap::datalink($self->_pcapd);
+   $self->firstLayer($mapLinks->{$link} || NF_LAYER_UNKNOWN);
+}
+
 sub _dumpPcapNext {
    my $self = shift;
 
@@ -111,7 +118,7 @@ sub _dumpPcapNext {
       my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
                                     : $self->_setTimestamp;
       return {
-         firstLayer => $mapLinks->{$self->firstLayer} || NF_LAYER_UNKNOWN,
+         firstLayer => $self->firstLayer,
          timestamp  => $ts,
          raw        => $raw,
       };
@@ -167,7 +174,7 @@ Net::Frame::Dump - tcpdump like implementation
 
 =head1 DESCRIPTION
 
-B<Net::Frame::Dump> is the base class for all dump modules. With them, you can open a device for live capture, for offline analyzing, or for creating a pcap file.
+B<Net::Frame::Dump> is the base class for all dump modules. With them, you can open a device for live capture, for offline analysis, or for creating a pcap file.
 
 See B<Net::Frame::Dump::Offline>, B<Net::Frame::Dump::Online>, B<Net::Frame::Dump::Writer> for specific usage.
 
@@ -201,7 +208,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2007, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

@@ -1,5 +1,5 @@
 #
-# $Id: Writer.pm,v 1.4 2006/12/14 17:50:20 gomor Exp $
+# $Id: Writer.pm,v 1.5 2007/01/08 22:07:24 gomor Exp $
 #
 package Net::Frame::Dump::Writer;
 use strict;
@@ -15,18 +15,30 @@ use Carp;
 use Net::Pcap;
 
 sub new {
-   shift->SUPER::new(
-      firstLayer => NF_DUMP_LAYER_RAW,
+   shift->_dumpNew(
+      firstLayer => 'RAW',
       @_,
    );
 }
 
+my $mapLinks = {
+   NULL => NF_DUMP_LAYER_NULL(),
+   ETH  => NF_DUMP_LAYER_ETH(),
+   RAW  => NF_DUMP_LAYER_RAW(),
+   SLL  => NF_DUMP_LAYER_SLL(),
+   PPP  => NF_DUMP_LAYER_PPP(),
+};
+
 sub _getPcapHeader {
    my $self = shift;
+
+   my $val = $mapLinks->{$self->[$__firstLayer]}
+      or croak("Can't get pcap header information for this layer type\n");
+
    # 24 bytes header
    "\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00".
    "\x00\x00\x00\x00\xdc\x05\x00\x00".
-   pack('C', $self->[$__firstLayer]).
+   pack('C', $val).
    "\x00\x00\x00";
 }
 
@@ -114,11 +126,44 @@ Net::Frame::Dump::Writer - tcpdump like implementation, writer mode
 
 =head1 SYNOPSIS
 
+   use Net::Frame::Dump::Writer;
+
+   my $oDump = Net::Frame::Dump::Writer->new(
+      file       => 'new-file.pcap',
+      firstLayer => 'ETH',
+   );
+
+   $oDump->start;
+
+   $oDump->write({ timestamp => '10.10', raw => ('A' x 14) });
+
+   $oDump->stop;
+
 =head1 DESCRIPTION
+
+This module implements a pcap file builder. You will be able to create frames, then write them in the pcap file format to a file.
 
 =head1 ATTRIBUTES
 
+The following are inherited attributes:
+
 =over 4
+
+=item B<file>
+
+Name of the .pcap file to generate.
+
+=item B<overwrite>
+
+Overwrites a .pcap file that already exists. Default to not.
+
+=item B<firstLayer>
+
+Stores information about the first layer type. It is used to write .pcap file header information.
+
+=item B<isRunning>
+
+Returns true if a call to B<start> has been done, false otherwise or if a call to B<stop> has been done.
 
 =back
 
@@ -128,13 +173,27 @@ Net::Frame::Dump::Writer - tcpdump like implementation, writer mode
 
 =item B<new>
 
+=item B<new> (hash)
+
+Object constructor. You can pass attributes that will overwrite default ones. See B<SYNOPSIS> for default values.
+
 =item B<start>
+
+When you want to start writing frames to the file, call this method.
 
 =item B<stop>
 
-=item B<write>
+When you want to stop writing frames to the file, call this method.
+
+=item B<write> ({ timestamp => $value, raw => $rawFrame })
+
+Takes a hashref as a parameter. This hashref MUST have timestamp and raw keys, with values. The raw data will be stored to the .pcap file.
 
 =back
+
+=head1 SEE ALSO
+
+L<Net::Frame::Dump>
 
 =head1 AUTHOR
 
@@ -142,7 +201,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2007, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.
