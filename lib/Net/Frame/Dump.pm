@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm,v 1.8 2007/01/08 22:04:01 gomor Exp $
+# $Id: Dump.pm 94 2008-02-16 16:56:28Z gomor $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 require Class::Gomor::Array;
 require Exporter;
@@ -18,6 +18,7 @@ our %EXPORT_TAGS = (
       NF_DUMP_LAYER_RAW
       NF_DUMP_LAYER_SLL
       NF_DUMP_LAYER_PPP
+      NF_DUMP_LAYER_80211RADIO
    )],
 );
 our @EXPORT_OK = (
@@ -29,6 +30,7 @@ use constant NF_DUMP_LAYER_ETH  => 1;
 use constant NF_DUMP_LAYER_PPP  => 9;
 use constant NF_DUMP_LAYER_RAW  => 12;
 use constant NF_DUMP_LAYER_SLL  => 113;
+use constant NF_DUMP_LAYER_80211RADIO => 127;
 
 our @AS = qw(
    file
@@ -102,6 +104,7 @@ my $mapLinks = {
    NF_DUMP_LAYER_RAW()  => 'RAW',
    NF_DUMP_LAYER_SLL()  => 'SLL',
    NF_DUMP_LAYER_PPP()  => 'PPP',
+   NF_DUMP_LAYER_80211RADIO() => '80211RADIO',
 };
 
 sub _dumpGetFirstLayer {
@@ -194,6 +197,8 @@ Load them: use Net::Frame::Dump qw(:consts);
 
 =item B<NF_DUMP_LAYER_PPP>
 
+=item B<NF_DUMP_LAYER_80211RADIO>
+
 Various supported link layers.
 
 =back
@@ -208,7 +213,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2007, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

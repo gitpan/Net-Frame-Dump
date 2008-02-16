@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm,v 1.8 2007/01/08 22:13:16 gomor Exp $
+# $Id: Offline.pm 95 2008-02-16 16:56:59Z gomor $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -36,16 +36,8 @@ sub _setFilter {
 
    return unless $str;
 
-   my ($net, $mask, $err);
-   Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
-   if ($err) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::lookupnet: @{[$self->[$__dev]]}: ".
-            "$err\n");
-   }
-
    my $filter;
-   Net::Pcap::compile($self->[$___pcapd], \$filter, $str, 0,
-                      $mask);
+   Net::Pcap::compile($self->[$___pcapd], \$filter, $str, 0, 0);
    unless ($filter) {
       croak("@{[(caller(0))[3]]}: Net::Pcap::compile: error\n");
    }
@@ -207,7 +199,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2007, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

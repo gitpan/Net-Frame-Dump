@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm,v 1.6 2007/01/08 22:13:16 gomor Exp $
+# $Id: Online.pm 97 2008-02-16 16:57:24Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -601,7 +601,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2007, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.
