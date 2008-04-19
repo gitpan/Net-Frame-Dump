@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 97 2008-02-16 16:57:24Z gomor $
+# $Id: Online.pm 152 2008-04-19 16:52:38Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -13,6 +13,7 @@ our @AS = qw(
    timeoutOnNext
    timeout
    promisc
+   snaplen
    unlinkOnStop
    onRecv
    onRecvCount
@@ -58,6 +59,7 @@ sub new {
       timeoutOnNext  => 3,
       timeout        => 0,
       promisc        => 0,
+      snaplen        => 1514,
       unlinkOnStop   => 1,
       onRecvCount    => -1,
       _sName         => "netframe-tmp-$$.$int.storable",
@@ -117,7 +119,7 @@ sub _startOnRecv {
    my $err;
    my $pd = Net::Pcap::open_live(
       $self->[$__dev],
-      1514,
+      $self->[$__snaplen],
       $self->[$__promisc],
       1000,
       \$err,
@@ -257,7 +259,7 @@ sub _startTcpdump {
    my $err;
    my $pd = Net::Pcap::open_live(
       $self->[$__dev],
-      1514,
+      $self->[$__snaplen],
       $self->[$__promisc],
       1000,
       \$err,
@@ -486,6 +488,10 @@ Each time you call B<next> method, an internal counter is updated. This counter 
 =item B<timeout>
 
 When B<timeoutOnNext> seconds has been reached, this variable is set to true, and never reset. See B<timeoutReset> if you want to reset it.
+
+=item B<snaplen>
+
+If you want to capture a different snaplen, set it a number. Default to 1514.
 
 =item B<promisc>
 
