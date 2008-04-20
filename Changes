@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Frame::Dump.
 
+1.04 Sun Apr 20 12:20:04 CEST 2008
+   - bugfix: do not return() when no IPv4 address is assigned in live capture
+   - update: mailing list URL, see README
+
 1.03 Sat Apr 19 18:51:49 CEST 2008
    - new: added snaplen attribute in Net::Frame::Dump::Online
 

@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 152 2008-04-19 16:52:38Z gomor $
+# $Id: Online.pm 154 2008-04-20 10:20:40Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -134,7 +134,6 @@ sub _startOnRecv {
    Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
    if ($err) {
       carp("@{[(caller(0))[3]]}: lookupnet: $err\n");
-      return undef;
    }
 
    my $fcode;
