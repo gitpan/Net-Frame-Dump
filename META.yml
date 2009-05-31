@@ -1,17 +1,25 @@
 --- #YAML:1.0
-name:                Net-Frame-Dump
-version:             1.04
-abstract:            tcpdump like implementation
-license:             artistic
-author:              
-    - GomoR <perl@gomor.org>
-generated_by:        ExtUtils::MakeMaker version 6.44
-distribution_type:   module
-requires:     
-    Class::Gomor:                  1.00
-    Net::Frame:                    0
-    Net::Pcap:                     0.12
-    Time::HiRes:                   0
+name:               Net-Frame-Dump
+version:            1.05
+abstract:           tcpdump like implementation
+author:
+    - GomoR <gomor-cpan_at_gomor.org>
+license:            artistic
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
+requires:
+    Class::Gomor:  1.00
+    Net::Frame:    0
+    Net::Pcap:     0.12
+    Time::HiRes:   0
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.50
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
-    version: 1.3
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4

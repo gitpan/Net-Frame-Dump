@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 154 2008-04-20 10:20:40Z gomor $
+# $Id: Online.pm 312 2009-05-31 14:45:13Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -44,16 +44,17 @@ use Time::HiRes qw(gettimeofday);
 use Storable qw(lock_store lock_retrieve);
 use Net::Frame::Layer qw(:subs);
 
-sub _checkWin32 { }
+sub _checkWin32 { return 1; }
 
 sub _checkOther {
-   croak("Must be EUID 0 (or equivalent) to open a device for live capture.\n")
-      if $>;
+   if ($>) {
+      warn("Must be EUID 0 (or equivalent) to open a device for live capture.\n");
+      return;
+   }
+   return 1;
 }
 
 sub new {
-   _check();
-
    my $int = getRandom32bitsInt();
    my $self = shift->_dumpNew(
       timeoutOnNext  => 3,
@@ -68,18 +69,19 @@ sub new {
    );
 
    unless ($self->[$__dev]) {
-      croak("You MUST pass `dev' attribute\n");
+      warn("You MUST pass `dev' attribute\n");
+      return;
    }
 
-   $self;
+   return $self;
 }
 
 sub _sStore {
-   lock_store(\$_[1], $_[0]->[$___sName])
-      or do {
-         carp("@{[(caller(0))[3]]}: lock_store: @{[$_[0]->[$___sName]]}: $!\n");
-         return undef;
-      };
+   lock_store(\$_[1], $_[0]->[$___sName]) or do {
+      warn("@{[(caller(0))[3]]}: lock_store: @{[$_[0]->[$___sName]]}: $!\n");
+      return;
+   };
+   return 1;
 }
 sub _sRetrieve { ${lock_retrieve(shift->[$___sName])} }
 
@@ -89,11 +91,13 @@ sub _sWaitFile {
    my $thisTime  = $startTime;
    while (! -f $self->[$___sName]) {
       if ($thisTime - $startTime > 10) {
-         croak("@{[(caller(0))[3]]}: too long for file creation: ".
-               $self->[$___sName]."\n")
+         warn("@{[(caller(0))[3]]}: too long for file creation: ".
+              $self->[$___sName]."\n");
+         return;
       }
       $thisTime = gettimeofday();
    }
+   return 1;
 }
 
 sub _sWaitFileSize {
@@ -106,11 +110,13 @@ sub _sWaitFileSize {
    while (! ((stat($self->[$___sName]))[7] > 0)) {
       if ($thisTime - $startTime > 10) {
          $self->_clean;
-         croak("@{[(caller(0))[3]]}: too long for file creation2: ".
-               $self->[$___sName]."\n")
+         warn("@{[(caller(0))[3]]}: too long for file creation2: ".
+              $self->[$___sName]."\n");
+         return;
       }
       $thisTime = gettimeofday();
    }
+   return 1;
 }
 
 sub _startOnRecv {
@@ -125,7 +131,8 @@ sub _startOnRecv {
       \$err,
    );
    unless ($pd) {
-      croak("@{[(caller(0))[3]]}: open_live: $err\n");
+      warn("@{[(caller(0))[3]]}: open_live: $err\n");
+      return;
    }
    $self->[$___pcapd] = $pd;
 
@@ -133,16 +140,18 @@ sub _startOnRecv {
    my $mask = 0;
    Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
    if ($err) {
-      carp("@{[(caller(0))[3]]}: lookupnet: $err\n");
+      warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
    }
 
    my $fcode;
    if (Net::Pcap::compile($pd, \$fcode, $self->[$__filter], 0, $mask) < 0) {
-      croak("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      return;
    }
 
    if (Net::Pcap::setfilter($pd, $fcode) < 0) {
-      croak("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      warn("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      return;
    }
 
    $self->_dumpGetFirstLayer;
@@ -166,11 +175,14 @@ sub _startOnRecv {
 sub start {
    my $self = shift;
 
+   _check() or return;
+
    $self->[$__isRunning] = 1;
 
    if (-f $self->[$__file] && ! $self->[$__overwrite]) {
-      croak("We will not overwrite a file by default. Use `overwrite' ".
-            "attribute to do it.\n");
+      warn("We will not overwrite a file by default. Use `overwrite' ".
+           "attribute to do it.\n");
+      return;
    }
 
    if ($self->onRecv) {
@@ -183,7 +195,7 @@ sub start {
       $self->_openFile;
    }
 
-   1;
+   return 1;
 }
 
 sub _clean {
@@ -228,7 +240,7 @@ sub getStats {
    unless ($self->[$___pcapd]) {
       carp("@{[(caller(0))[3]]}: unable to get stats, no pcap descriptor ".
            "opened.\n");
-      return undef;
+      return;
    }
 
    my %stats;
@@ -264,29 +276,33 @@ sub _startTcpdump {
       \$err,
    );
    unless ($pd) {
-      croak("@{[(caller(0))[3]]}: open_live: $err\n");
+      warn("@{[(caller(0))[3]]}: open_live: $err\n");
+      return;
    }
 
    my $net  = 0;
    my $mask = 0;
    Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
    if ($err) {
-      carp("@{[(caller(0))[3]]}: lookupnet: $err\n");
-      return undef;
+      warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
+      return;
    }
 
    my $fcode;
    if (Net::Pcap::compile($pd, \$fcode, $self->[$__filter], 0, $mask) < 0) {
-      croak("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      return;
    }
 
    if (Net::Pcap::setfilter($pd, $fcode) < 0) {
-      croak("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      warn("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      return;
    }
 
    my $p = Net::Pcap::dump_open($pd, $self->[$__file]);
    unless ($p) {
-      croak("@{[(caller(0))[3]]}: dump_open: ". Net::Pcap::geterr($pd). "\n");
+      warn("@{[(caller(0))[3]]}: dump_open: ". Net::Pcap::geterr($pd). "\n");
+      return;
    }
    Net::Pcap::dump_flush($p);
 
@@ -341,8 +357,9 @@ sub _openFile {
    my $err;
    $self->[$___pcapd] = Net::Pcap::open_offline($self->[$__file], \$err);
    unless ($self->[$___pcapd]) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-            "@{[$self->[$__file]]}: $err\n");
+      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
+           "@{[$self->[$__file]]}: $err\n");
+      return;
    }
 
    $self->_dumpGetFirstLayer;
@@ -372,10 +389,10 @@ sub _nextTimeoutHandle {
          $self->[$__timeout]    = 1;
          $self->[$___firstTime] = 0;
          $self->cgDebugPrint(1, "Timeout occured");
-         return undef;
+         return;
       }
    }
-   1;
+   return 1;
 }
 
 sub _nextTimeoutReset { shift->[$___firstTime] = 0 }
@@ -385,7 +402,7 @@ sub timeoutReset { shift->[$__timeout] = 0 }
 sub next {
    my $self = shift;
 
-   $self->_nextTimeoutHandle or return undef;
+   $self->_nextTimeoutHandle or return;
 
    my $frame = $self->_getNextAwaitingFrame;
    $self->_nextTimeoutReset if $frame;
@@ -606,7 +623,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2009, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

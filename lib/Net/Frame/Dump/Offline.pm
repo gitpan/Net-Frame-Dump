@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm 95 2008-02-16 16:56:59Z gomor $
+# $Id: Offline.pm 312 2009-05-31 14:45:13Z gomor $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -23,8 +23,9 @@ sub _openFile {
    my $err;
    $self->[$___pcapd] = Net::Pcap::open_offline($self->[$__file], \$err);
    unless ($self->[$___pcapd]) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-            "@{[$self->[$__file]]}: $err\n");
+      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
+           "@{[$self->[$__file]]}: $err\n");
+      return;
    }
 
    $self->_dumpGetFirstLayer;
@@ -39,7 +40,8 @@ sub _setFilter {
    my $filter;
    Net::Pcap::compile($self->[$___pcapd], \$filter, $str, 0, 0);
    unless ($filter) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::compile: error\n");
+      warn("@{[(caller(0))[3]]}: Net::Pcap::compile: error\n");
+      return;
    }
 
    Net::Pcap::setfilter($self->[$___pcapd], $filter);
@@ -51,13 +53,14 @@ sub start {
    $self->[$__isRunning] = 1;
 
    if (! -f $self->[$__file]) {
-      croak("File does not exists: ".$self->[$__file]."\n");
+      warn("File does not exists: ".$self->[$__file]."\n");
+      return;
    }
 
    $self->_openFile;
    $self->_setFilter;
 
-   1;
+   return 1;
 }
 
 sub stop {
@@ -68,7 +71,7 @@ sub stop {
    Net::Pcap::close($self->[$___pcapd]);
    $self->[$__isRunning] = 0;
 
-   1;
+   return 1;
 }
 
 sub next         { shift->_dumpPcapNext(@_)     }
@@ -199,7 +202,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2009, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

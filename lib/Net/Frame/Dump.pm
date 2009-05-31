@@ -1,14 +1,13 @@
 #
-# $Id: Dump.pm 154 2008-04-20 10:20:40Z gomor $
+# $Id: Dump.pm 312 2009-05-31 14:45:13Z gomor $
 #
 package Net::Frame::Dump;
-use strict;
-use warnings;
+use strict; use warnings;
 
-our $VERSION = '1.04';
+our $VERSION = '1.05';
 
-require Class::Gomor::Array;
-require Exporter;
+use Class::Gomor::Array;
+use Exporter;
 our @ISA = qw(Class::Gomor::Array Exporter);
 
 our %EXPORT_TAGS = (
@@ -18,7 +17,8 @@ our %EXPORT_TAGS = (
       NF_DUMP_LAYER_RAW
       NF_DUMP_LAYER_SLL
       NF_DUMP_LAYER_PPP
-      NF_DUMP_LAYER_80211RADIO
+      NF_DUMP_LAYER_80211_RADIOTAP
+      NF_DUMP_LAYER_80211
    )],
 );
 our @EXPORT_OK = (
@@ -29,8 +29,9 @@ use constant NF_DUMP_LAYER_NULL => 0;
 use constant NF_DUMP_LAYER_ETH  => 1;
 use constant NF_DUMP_LAYER_PPP  => 9;
 use constant NF_DUMP_LAYER_RAW  => 12;
-use constant NF_DUMP_LAYER_SLL  => 113;
-use constant NF_DUMP_LAYER_80211RADIO => 127;
+use constant NF_DUMP_LAYER_80211      => 105;
+use constant NF_DUMP_LAYER_SLL        => 113;
+use constant NF_DUMP_LAYER_80211_RADIOTAP => 127;
 
 our @AS = qw(
    file
@@ -54,6 +55,8 @@ use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Net::Frame::Layer qw(:consts :subs);
+
+our $Errbuf;
 
 sub _dumpNew {
    my $int = getRandom32bitsInt();
@@ -104,7 +107,8 @@ my $mapLinks = {
    NF_DUMP_LAYER_RAW()  => 'RAW',
    NF_DUMP_LAYER_SLL()  => 'SLL',
    NF_DUMP_LAYER_PPP()  => 'PPP',
-   NF_DUMP_LAYER_80211RADIO() => '80211RADIO',
+   NF_DUMP_LAYER_80211()          => '80211',
+   NF_DUMP_LAYER_80211_RADIOTAP() => '80211::Radiotap',
 };
 
 sub _dumpGetFirstLayer {
@@ -127,7 +131,7 @@ sub _dumpPcapNext {
       };
    }
 
-   undef;
+   return;
 }
 
 sub _dumpGetFramesFor {
@@ -197,7 +201,9 @@ Load them: use Net::Frame::Dump qw(:consts);
 
 =item B<NF_DUMP_LAYER_PPP>
 
-=item B<NF_DUMP_LAYER_80211RADIO>
+=item B<NF_DUMP_LAYER_80211_RADIOTAP>
+
+=item B<NF_DUMP_LAYER_80211>
 
 Various supported link layers.
 
@@ -213,7 +219,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2009, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

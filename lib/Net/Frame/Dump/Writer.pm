@@ -1,5 +1,5 @@
 #
-# $Id: Writer.pm 97 2008-02-16 16:57:24Z gomor $
+# $Id: Writer.pm 312 2009-05-31 14:45:13Z gomor $
 #
 package Net::Frame::Dump::Writer;
 use strict;
@@ -32,8 +32,10 @@ my $mapLinks = {
 sub _getPcapHeader {
    my $self = shift;
 
-   my $val = $mapLinks->{$self->[$__firstLayer]}
-      or croak("Can't get pcap header information for this layer type\n");
+   my $val = $mapLinks->{$self->[$__firstLayer]} or do {
+      warn("Can't get pcap header information for this layer type\n");
+      return;
+   };
 
    # 24 bytes header
    "\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00".
@@ -47,26 +49,30 @@ sub _openFile {
 
    my $file = $self->[$__file];
    my $hdr  = $self->_getPcapHeader;
-   open(my $fh, '>', $file)
-      or croak("@{[(caller(0))[3]]}: open: $file: $!\n");
+   open(my $fh, '>', $file) or do {
+      warn("@{[(caller(0))[3]]}: open: $file: $!\n");
+      return;
+   };
    syswrite($fh, $hdr, length($hdr));
    close($fh);
 
    my $err;
    my $pcapd = Net::Pcap::open_offline($file, \$err);
    unless ($pcapd) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-            "$file: $err\n");
+      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
+           "$file: $err\n");
+      return;
    }
    $self->[$___pcapd] = $pcapd;
 
    $self->[$___dumper] = Net::Pcap::dump_open($pcapd, $file);
    unless ($self->[$___dumper]) {
-      croak("@{[(caller(0))[3]]}: Net::Pcap::dump_open: ".
-            Net::Pcap::geterr($pcapd)."\n");
+      warn("@{[(caller(0))[3]]}: Net::Pcap::dump_open: ".
+           Net::Pcap::geterr($pcapd)."\n");
+      return;
    }
 
-   1;
+   return 1;
 }
 
 sub start {
@@ -75,13 +81,14 @@ sub start {
    $self->[$__isRunning] = 1;
 
    if (-f $self->[$__file] && ! $self->[$__overwrite]) {
-      croak("We will not overwrite a file by default. Use `overwrite' ".
-            "attribute to do it\n");
+      warn("We will not overwrite a file by default. Use `overwrite' ".
+           "attribute to do it\n");
+      return;
    }
 
    $self->_openFile;
 
-   1;
+   return 1;
 }
 
 sub stop {
@@ -94,7 +101,7 @@ sub stop {
    Net::Pcap::close($self->[$___pcapd]);
    $self->[$__isRunning] = 0;
 
-   1;
+   return 1;
 }
 
 sub write {
@@ -201,7 +208,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2008, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2009, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

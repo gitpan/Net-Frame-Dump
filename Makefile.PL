@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.PL 101 2008-02-17 12:36:50Z gomor $
+# $Id: Makefile.PL 312 2009-05-31 14:45:13Z gomor $
 #
 use ExtUtils::MakeMaker;
 
@@ -10,7 +10,7 @@ WriteMakefile(
    VERSION_FROM  => 'lib/Net/Frame/Dump.pm',
    LICENSE       => 'artistic',
    ABSTRACT_FROM => 'lib/Net/Frame/Dump.pm',
-   AUTHOR        => 'GomoR <perl@gomor.org>',
+   AUTHOR        => 'GomoR <gomor-cpan_at_gomor.org>',
    PREREQ_PM     => {
       Class::Gomor => '1.00',
       Net::Pcap    => '0.12',
