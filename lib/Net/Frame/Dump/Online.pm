@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 312 2009-05-31 14:45:13Z gomor $
+# $Id: Online.pm 314 2009-06-16 22:13:31Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -22,6 +22,7 @@ our @AS = qw(
    _sName
    _sDataAwaiting
    _firstTime
+   _son
 );
 __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
@@ -221,17 +222,13 @@ sub stop {
       Net::Pcap::close($self->[$___pcapd]);
    }
    else {
-      return if $self->isSon;
-
       $self->_killTcpdump;
-      $self->[$___pid] = undef;
-
       Net::Pcap::close($self->[$___pcapd]);
    }
 
    $self->[$__isRunning] = 0;
 
-   1;
+   return 1;
 }
 
 sub getStats {
@@ -245,11 +242,11 @@ sub getStats {
 
    my %stats;
    Net::Pcap::stats($self->[$___pcapd], \%stats);
-   \%stats;
+   return \%stats;
 }
 
-sub isFather { shift->[$___pid] ? 1 : 0 }
-sub isSon    { shift->[$___pid] ? 0 : 1 }
+sub isFather { ! shift->[$___son] }
+sub isSon    {   shift->[$___son] }
 
 sub _sonPrintStats {
    my $self = shift;
@@ -310,11 +307,12 @@ sub _startTcpdump {
 
    my $pid = fork();
    croak("@{[(caller(0))[3]]}: fork: $!\n") unless defined $pid;
-   if ($pid) {
+   if ($pid) {   # Parent
       $self->[$___pid] = $pid;
       return 1;
    }
-   else {
+   else {   # Son
+      $self->[$___son]   = 1;
       $self->[$___pcapd] = $pd;
       $SIG{INT}  = sub { $self->_sonPrintStats };
       $SIG{TERM} = sub { $self->_sonPrintStats };
@@ -341,14 +339,16 @@ sub _tcpdumpCallback {
 
 sub _killTcpdumpWin32 {
    my $self = shift;
-   return unless $self->[$___pid];
+   return if $self->isSon;
    kill('KILL', $self->[$___pid]);
+   $self->[$___pid] = undef;
 }
 
 sub _killTcpdumpOther {
    my $self = shift;
-   return unless $self->[$___pid];
+   return if $self->isSon;
    kill('TERM', $self->[$___pid]);
+   $self->[$___pid] = undef;
 }
 
 sub _openFile {
@@ -371,7 +371,7 @@ sub _getNextAwaitingFrame {
    my $new  = $self->_sRetrieve;
 
    # Return if nothing new is awaiting
-   return undef if ($new <= $last);
+   return if ($new <= $last);
 
    $self->[$___sDataAwaiting]++;
    $self->_dumpPcapNext;
@@ -407,7 +407,7 @@ sub next {
    my $frame = $self->_getNextAwaitingFrame;
    $self->_nextTimeoutReset if $frame;
 
-   $frame;
+   return $frame;
 }
 
 sub getFramesFor { shift->_dumpGetFramesFor(@_) }

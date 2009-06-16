@@ -1,10 +1,10 @@
 #
-# $Id: Dump.pm 312 2009-05-31 14:45:13Z gomor $
+# $Id: Dump.pm 314 2009-06-16 22:13:31Z gomor $
 #
 package Net::Frame::Dump;
 use strict; use warnings;
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 use Class::Gomor::Array;
 use Exporter;
@@ -148,7 +148,7 @@ sub _dumpGetFramesFor {
       push @$results, @{$self->_framesStored->{ICMPv4}};
    }
 
-   $results ? @$results : ();
+   return $results ? @$results : ();
 }
 
 sub _dumpFramesStored {
@@ -168,7 +168,7 @@ sub _dumpFramesStored {
    }
 
    # We return the hash ref
-   $self->_framesStored;
+   return $self->_framesStored;
 }
 
 1;

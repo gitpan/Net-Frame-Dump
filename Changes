@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Frame::Dump.
 
+1.06 Wed Jun 17 00:11:39 CEST 2009
+   - bugfix: isSon() and isFather() from Net::Frame::Dump::Online 
+     now truly return isSon() and isFather() ^^
+
 1.05 Sun May 31 16:43:22 CEST 2009
    - new: NF_DUMP_LAYER_80211 link layer support
    - new: NF_DUMP_LAYER_80211_RADIOTAP link layer support
