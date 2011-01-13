@@ -1,5 +1,14 @@
 Revision history for Perl extension Net::Frame::Dump.
 
+1.07 Thu Jan 13 11:17:12 CET 2011
+   - bugfix: stop() returns if in isSon()
+   - bugfix: stop() when _clean()
+   - update: _killTcpdump(), only KILL now
+   - update: you can send a SIGHUP to print pcap stats
+   - update: SIGINT & SIGTERM call _clean in parent process
+   - update: printStats() only print stats
+   - update: copyright notice
+
 1.06 Wed Jun 17 00:11:39 CEST 2009
    - bugfix: isSon() and isFather() from Net::Frame::Dump::Online 
      now truly return isSon() and isFather() ^^

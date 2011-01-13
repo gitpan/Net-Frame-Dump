@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 314 2009-06-16 22:13:31Z gomor $
+# $Id: Online.pm 328 2011-01-13 10:19:33Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -29,12 +29,11 @@ __PACKAGE__->cgBuildAccessorsScalar(\@AS);
 
 BEGIN {
    my $osname = {
-      cygwin  => [ \&_killTcpdumpWin32, \&_checkWin32, ],
-      MSWin32 => [ \&_killTcpdumpWin32, \&_checkWin32, ],
+      cygwin  => [ \&_checkWin32, ],
+      MSWin32 => [ \&_checkWin32, ],
    };
 
-   *_killTcpdump = $osname->{$^O}->[0] || \&_killTcpdumpOther;
-   *_check       = $osname->{$^O}->[1] || \&_checkOther;
+   *_check = $osname->{$^O}->[0] || \&_checkOther;
 }
 
 no strict 'vars';
@@ -69,6 +68,15 @@ sub new {
       @_,
    );
 
+   $SIG{INT} = sub {
+      return unless $self->isFather;
+      $self->_clean;
+   };
+   $SIG{TERM} = sub {
+      return unless $self->isFather;
+      $self->_clean;
+   };
+
    unless ($self->[$__dev]) {
       warn("You MUST pass `dev' attribute\n");
       return;
@@ -84,7 +92,9 @@ sub _sStore {
    };
    return 1;
 }
-sub _sRetrieve { ${lock_retrieve(shift->[$___sName])} }
+sub _sRetrieve {
+   ${lock_retrieve(shift->[$___sName])};
+}
 
 sub _sWaitFile {
    my $self = shift;
@@ -213,9 +223,8 @@ sub _clean {
 sub stop {
    my $self = shift;
 
-   $self->_clean;
-
    return unless $self->[$__isRunning];
+   return if     $self->isSon;
 
    if ($self->onRecv && $self->[$___pcapd]) {
       Net::Pcap::breakloop($self->[$___pcapd]);
@@ -223,10 +232,13 @@ sub stop {
    }
    else {
       $self->_killTcpdump;
+      Net::Pcap::breakloop($self->[$___pcapd]);
       Net::Pcap::close($self->[$___pcapd]);
    }
 
    $self->[$__isRunning] = 0;
+
+   $self->_clean;
 
    return 1;
 }
@@ -252,13 +264,10 @@ sub _sonPrintStats {
    my $self = shift;
 
    my $stats = $self->getStats;
-   Net::Pcap::breakloop($self->[$___pcapd]);
-   Net::Pcap::close($self->[$___pcapd]);
-
    $self->cgDebugPrint(1, 'Frames received  : '.$stats->{ps_recv});
    $self->cgDebugPrint(1, 'Frames dropped   : '.$stats->{ps_drop});
    $self->cgDebugPrint(1, 'Frames if dropped: '.$stats->{ps_ifdrop});
-   exit(0);
+   return;
 }
 
 sub _startTcpdump {
@@ -303,19 +312,17 @@ sub _startTcpdump {
    }
    Net::Pcap::dump_flush($p);
 
-   $SIG{CHLD} = 'IGNORE';
-
    my $pid = fork();
    croak("@{[(caller(0))[3]]}: fork: $!\n") unless defined $pid;
    if ($pid) {   # Parent
       $self->[$___pid] = $pid;
+      $SIG{CHLD} = 'IGNORE';
       return 1;
    }
    else {   # Son
       $self->[$___son]   = 1;
       $self->[$___pcapd] = $pd;
-      $SIG{INT}  = sub { $self->_sonPrintStats };
-      $SIG{TERM} = sub { $self->_sonPrintStats };
+      $SIG{HUP} = sub { $self->_sonPrintStats };
       $self->cgDebugPrint(1, "dev:    [@{[$self->[$__dev]]}]\n".
                              "file:   [@{[$self->[$__file]]}]\n".
                              "filter: [@{[$self->[$__filter]]}]");
@@ -337,17 +344,10 @@ sub _tcpdumpCallback {
    $self->_sStore(++$n);
 }
 
-sub _killTcpdumpWin32 {
+sub _killTcpdump {
    my $self = shift;
    return if $self->isSon;
    kill('KILL', $self->[$___pid]);
-   $self->[$___pid] = undef;
-}
-
-sub _killTcpdumpOther {
-   my $self = shift;
-   return if $self->isSon;
-   kill('TERM', $self->[$___pid]);
    $self->[$___pid] = undef;
 }
 
@@ -623,7 +623,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2009, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2011, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

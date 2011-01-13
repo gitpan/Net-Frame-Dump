@@ -10,6 +10,7 @@ use Net::Frame::Simple;
 use Class::Gomor qw($Debug);
 $Debug = 3;
 
+
 $oDump = Net::Frame::Dump::Online->new(dev => $dev);
 $oDump->start;
 
@@ -26,5 +27,3 @@ while (1) {
       print $f->print."\n";
    }
 }
-
-END { $oDump && $oDump->isRunning && $oDump->stop }
