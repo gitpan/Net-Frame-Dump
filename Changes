@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Frame::Dump.
 
+1.08 Sun Feb 20 17:51:58 CET 2011
+   - new: Net::Frame::Dump::Online2: non-blocking live capture
+   => If I had seen that sooner ...
+
 1.07 Thu Jan 13 11:17:12 CET 2011
    - bugfix: stop() returns if in isSon()
    - bugfix: stop() when _clean()

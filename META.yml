@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-Frame-Dump
-version:            1.07
+version:            1.08
 abstract:           tcpdump like implementation
 author:
     - GomoR <gomor-cpan_at_gomor.org>

@@ -1,4 +1,4 @@
-eval "use Test::Pod::Coverage tests => 4";
+eval "use Test::Pod::Coverage tests => 5";
 if ($@) {
    use Test;
    plan(tests => 1);
@@ -7,6 +7,7 @@ if ($@) {
 else {
    pod_coverage_ok("Net::Frame::Dump");
    pod_coverage_ok("Net::Frame::Dump::Online");
+   pod_coverage_ok("Net::Frame::Dump::Online2");
    pod_coverage_ok("Net::Frame::Dump::Offline");
    pod_coverage_ok("Net::Frame::Dump::Writer");
 }

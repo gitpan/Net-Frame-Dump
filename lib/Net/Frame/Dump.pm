@@ -1,10 +1,10 @@
 #
-# $Id: Dump.pm 328 2011-01-13 10:19:33Z gomor $
+# $Id: Dump.pm 332 2011-02-16 10:42:07Z gomor $
 #
 package Net::Frame::Dump;
 use strict; use warnings;
 
-our $VERSION = '1.07';
+our $VERSION = '1.08';
 
 use Class::Gomor::Array;
 use Exporter;
@@ -132,6 +132,25 @@ sub _dumpPcapNext {
    }
 
    return;
+}
+
+sub _dumpPcapNextEx {
+   my $self = shift;
+
+   my %hdr;
+   my $raw;
+   my $r;
+   if ($r = Net::Pcap::next_ex($self->_pcapd, \%hdr, \$raw) > 0) {
+      my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
+                                    : $self->_setTimestamp;
+      return {
+         firstLayer => $self->firstLayer,
+         timestamp  => $ts,
+         raw        => $raw,
+      };
+   }
+
+   return $r;
 }
 
 sub _dumpGetFramesFor {
