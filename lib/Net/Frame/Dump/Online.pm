@@ -1,13 +1,11 @@
 #
-# $Id: Online.pm 328 2011-01-13 10:19:33Z gomor $
+# $Id: Online.pm 349 2011-03-26 13:12:44Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
 use warnings;
 
-use Net::Frame::Dump qw(:consts);
-our @ISA = qw(Net::Frame::Dump);
-
+use base qw(Net::Frame::Dump);
 our @AS = qw(
    dev
    timeoutOnNext
@@ -36,7 +34,7 @@ BEGIN {
    *_check = $osname->{$^O}->[0] || \&_checkOther;
 }
 
-no strict 'vars';
+use Net::Frame::Dump qw(:consts);
 
 use Carp;
 use Net::Pcap;
@@ -55,18 +53,21 @@ sub _checkOther {
 }
 
 sub new {
-   my $int = getRandom32bitsInt();
-   my $self = shift->_dumpNew(
+   my $self = shift->SUPER::new(
       timeoutOnNext  => 3,
       timeout        => 0,
       promisc        => 0,
       snaplen        => 1514,
       unlinkOnStop   => 1,
       onRecvCount    => -1,
-      _sName         => "netframe-tmp-$$.$int.storable",
       _sDataAwaiting => 0,
       @_,
    );
+
+   if (!defined($self->_sName)) {
+      my $int = getRandom32bitsInt();
+      $self->_sName("netframe-tmp-$$.$int.storable");
+   }
 
    $SIG{INT} = sub {
       return unless $self->isFather;
@@ -77,7 +78,7 @@ sub new {
       $self->_clean;
    };
 
-   unless ($self->[$__dev]) {
+   if (!defined($self->dev)) {
       warn("You MUST pass `dev' attribute\n");
       return;
    }
@@ -86,24 +87,24 @@ sub new {
 }
 
 sub _sStore {
-   lock_store(\$_[1], $_[0]->[$___sName]) or do {
-      warn("@{[(caller(0))[3]]}: lock_store: @{[$_[0]->[$___sName]]}: $!\n");
+   lock_store(\$_[1], $_[0]->_sName) or do {
+      warn("@{[(caller(0))[3]]}: lock_store: @{[$_[0]->_sName]}: $!\n");
       return;
    };
    return 1;
 }
 sub _sRetrieve {
-   ${lock_retrieve(shift->[$___sName])};
+   ${lock_retrieve(shift->_sName)};
 }
 
 sub _sWaitFile {
    my $self = shift;
    my $startTime = gettimeofday();
    my $thisTime  = $startTime;
-   while (! -f $self->[$___sName]) {
+   while (! -f $self->_sName) {
       if ($thisTime - $startTime > 10) {
          warn("@{[(caller(0))[3]]}: too long for file creation: ".
-              $self->[$___sName]."\n");
+              $self->_sName."\n");
          return;
       }
       $thisTime = gettimeofday();
@@ -118,11 +119,11 @@ sub _sWaitFileSize {
 
    my $startTime = gettimeofday();
    my $thisTime  = $startTime;
-   while (! ((stat($self->[$___sName]))[7] > 0)) {
+   while (! ((stat($self->_sName))[7] > 0)) {
       if ($thisTime - $startTime > 10) {
          $self->_clean;
          warn("@{[(caller(0))[3]]}: too long for file creation2: ".
-              $self->[$___sName]."\n");
+              $self->_sName."\n");
          return;
       }
       $thisTime = gettimeofday();
@@ -135,9 +136,9 @@ sub _startOnRecv {
 
    my $err;
    my $pd = Net::Pcap::open_live(
-      $self->[$__dev],
-      $self->[$__snaplen],
-      $self->[$__promisc],
+      $self->dev,
+      $self->snaplen,
+      $self->promisc,
       1000,
       \$err,
    );
@@ -145,17 +146,17 @@ sub _startOnRecv {
       warn("@{[(caller(0))[3]]}: open_live: $err\n");
       return;
    }
-   $self->[$___pcapd] = $pd;
+   $self->_pcapd($pd);
 
    my $net  = 0;
    my $mask = 0;
-   Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
+   Net::Pcap::lookupnet($self->dev, \$net, \$mask, \$err);
    if ($err) {
       warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
    }
 
    my $fcode;
-   if (Net::Pcap::compile($pd, \$fcode, $self->[$__filter], 0, $mask) < 0) {
+   if (Net::Pcap::compile($pd, \$fcode, $self->filter, 0, $mask) < 0) {
       warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
@@ -165,7 +166,7 @@ sub _startOnRecv {
       return;
    }
 
-   $self->_dumpGetFirstLayer;
+   $self->getFirstLayer;
 
    # Setup onRecv enforced code, to make it simpler for user
    my $callback = sub {
@@ -178,9 +179,14 @@ sub _startOnRecv {
       &{$self->onRecv}($h, $userData);
    };
 
-   Net::Pcap::loop(
-      $pd, $self->[$__onRecvCount], $callback, $self->[$__onRecvData],
-   );
+   {
+      # We have to access onRecvData ARRAY indice to pass a ref
+      no strict 'vars';
+
+      Net::Pcap::loop(
+         $pd, $self->onRecvCount, $callback, $self->[$__onRecvData],
+      );
+   }
 }
 
 sub start {
@@ -188,9 +194,9 @@ sub start {
 
    _check() or return;
 
-   $self->[$__isRunning] = 1;
+   $self->isRunning(1);
 
-   if (-f $self->[$__file] && ! $self->[$__overwrite]) {
+   if (-f $self->file && !$self->overwrite) {
       warn("We will not overwrite a file by default. Use `overwrite' ".
            "attribute to do it.\n");
       return;
@@ -211,32 +217,35 @@ sub start {
 
 sub _clean {
    my $self = shift;
-   if ($self->[$__unlinkOnStop] && $self->[$__file] && -f $self->[$__file]) {
-      unlink($self->[$__file]);
+   if ($self->unlinkOnStop && $self->file && -f $self->file) {
+      unlink($self->file);
       $self->cgDebugPrint(1, "@{[$self->file]} removed");
    }
-   if ($self->[$___sName] && -f $self->[$___sName]) {
-      unlink($self->[$___sName]);
+   if ($self->_sName && -f $self->_sName) {
+      unlink($self->_sName);
    }
+   return 1;
 }
 
 sub stop {
    my $self = shift;
 
-   return unless $self->[$__isRunning];
-   return if     $self->isSon;
+   if (!$self->isRunning || $self->isSon) {
+      return;
+   }
 
-   if ($self->onRecv && $self->[$___pcapd]) {
-      Net::Pcap::breakloop($self->[$___pcapd]);
-      Net::Pcap::close($self->[$___pcapd]);
+   if ($self->onRecv && $self->_pcapd) {
+      Net::Pcap::breakloop($self->_pcapd);
+      Net::Pcap::close($self->_pcapd);
    }
    else {
       $self->_killTcpdump;
-      Net::Pcap::breakloop($self->[$___pcapd]);
-      Net::Pcap::close($self->[$___pcapd]);
+      Net::Pcap::breakloop($self->_pcapd);
+      Net::Pcap::close($self->_pcapd);
    }
 
-   $self->[$__isRunning] = 0;
+   $self->isRunning(0);
+   $self->_pcapd(undef);
 
    $self->_clean;
 
@@ -246,19 +255,19 @@ sub stop {
 sub getStats {
    my $self = shift;
 
-   unless ($self->[$___pcapd]) {
+   if (!defined($self->_pcapd)) {
       carp("@{[(caller(0))[3]]}: unable to get stats, no pcap descriptor ".
            "opened.\n");
       return;
    }
 
    my %stats;
-   Net::Pcap::stats($self->[$___pcapd], \%stats);
+   Net::Pcap::stats($self->_pcapd, \%stats);
    return \%stats;
 }
 
-sub isFather { ! shift->[$___son] }
-sub isSon    {   shift->[$___son] }
+sub isFather { ! shift->_son }
+sub isSon    {   shift->_son }
 
 sub _sonPrintStats {
    my $self = shift;
@@ -275,9 +284,9 @@ sub _startTcpdump {
 
    my $err;
    my $pd = Net::Pcap::open_live(
-      $self->[$__dev],
-      $self->[$__snaplen],
-      $self->[$__promisc],
+      $self->dev,
+      $self->snaplen,
+      $self->promisc,
       1000,
       \$err,
    );
@@ -288,14 +297,13 @@ sub _startTcpdump {
 
    my $net  = 0;
    my $mask = 0;
-   Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
+   Net::Pcap::lookupnet($self->dev, \$net, \$mask, \$err);
    if ($err) {
       warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
-      return;
    }
 
    my $fcode;
-   if (Net::Pcap::compile($pd, \$fcode, $self->[$__filter], 0, $mask) < 0) {
+   if (Net::Pcap::compile($pd, \$fcode, $self->filter, 0, $mask) < 0) {
       warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
@@ -305,7 +313,7 @@ sub _startTcpdump {
       return;
    }
 
-   my $p = Net::Pcap::dump_open($pd, $self->[$__file]);
+   my $p = Net::Pcap::dump_open($pd, $self->file);
    unless ($p) {
       warn("@{[(caller(0))[3]]}: dump_open: ". Net::Pcap::geterr($pd). "\n");
       return;
@@ -315,17 +323,18 @@ sub _startTcpdump {
    my $pid = fork();
    croak("@{[(caller(0))[3]]}: fork: $!\n") unless defined $pid;
    if ($pid) {   # Parent
-      $self->[$___pid] = $pid;
+      $self->_son(0);
+      $self->_pid($pid);
       $SIG{CHLD} = 'IGNORE';
       return 1;
    }
    else {   # Son
-      $self->[$___son]   = 1;
-      $self->[$___pcapd] = $pd;
+      $self->_son(1);
+      $self->_pcapd($pd);
       $SIG{HUP} = sub { $self->_sonPrintStats };
-      $self->cgDebugPrint(1, "dev:    [@{[$self->[$__dev]]}]\n".
-                             "file:   [@{[$self->[$__file]]}]\n".
-                             "filter: [@{[$self->[$__filter]]}]");
+      $self->cgDebugPrint(1, "dev:    [@{[$self->dev]}]\n".
+                             "file:   [@{[$self->file]}]\n".
+                             "filter: [@{[$self->filter]}]");
       Net::Pcap::loop($pd, -1, \&_tcpdumpCallback, [ $p, $self ]);
       Net::Pcap::close($pd);
       exit(0);
@@ -347,57 +356,61 @@ sub _tcpdumpCallback {
 sub _killTcpdump {
    my $self = shift;
    return if $self->isSon;
-   kill('KILL', $self->[$___pid]);
-   $self->[$___pid] = undef;
+   kill('KILL', $self->_pid);
+   $self->_pid(undef);
 }
 
 sub _openFile {
    my $self = shift;
 
    my $err;
-   $self->[$___pcapd] = Net::Pcap::open_offline($self->[$__file], \$err);
-   unless ($self->[$___pcapd]) {
+   my $pcapd = Net::Pcap::open_offline($self->file, \$err);
+   if (!defined($pcapd)) {
       warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-           "@{[$self->[$__file]]}: $err\n");
+           "@{[$self->file]}: $err\n");
       return;
    }
+   $self->_pcapd($pcapd);
 
-   $self->_dumpGetFirstLayer;
+   return $self->getFirstLayer;
 }
 
 sub _getNextAwaitingFrame {
    my $self = shift;
-   my $last = $self->[$___sDataAwaiting];
+   my $last = $self->_sDataAwaiting;
    my $new  = $self->_sRetrieve;
 
    # Return if nothing new is awaiting
    return if ($new <= $last);
 
-   $self->[$___sDataAwaiting]++;
-   $self->_dumpPcapNext;
+   $self->_sDataAwaiting($self->_sDataAwaiting + 1);
+   return $self->next;
 }
 
 sub _nextTimeoutHandle {
    my $self = shift;
 
    # Handle timeout
-   my $thisTime = gettimeofday()      if     $self->[$__timeoutOnNext];
-   $self->[$___firstTime] = $thisTime unless $self->[$___firstTime];
+   my $thisTime = gettimeofday();
+   if ($self->timeoutOnNext && !$self->_firstTime) {
+      $self->_firstTime($thisTime);
+   }
 
-   if ($self->[$__timeoutOnNext] && $self->[$___firstTime]) {
-      if (($thisTime - $self->[$___firstTime]) > $self->[$__timeoutOnNext]) {
-         $self->[$__timeout]    = 1;
-         $self->[$___firstTime] = 0;
+   if ($self->timeoutOnNext && $self->_firstTime) {
+      if (($thisTime - $self->_firstTime) > $self->timeoutOnNext) {
+         $self->timeout(1);
+         $self->_firstTime(0);
          $self->cgDebugPrint(1, "Timeout occured");
          return;
       }
    }
+
    return 1;
 }
 
-sub _nextTimeoutReset { shift->[$___firstTime] = 0 }
+sub _nextTimeoutReset { shift->_firstTime(0) }
 
-sub timeoutReset { shift->[$__timeout] = 0 }
+sub timeoutReset { shift->timeout(0) }
 
 sub next {
    my $self = shift;
@@ -409,10 +422,6 @@ sub next {
 
    return $frame;
 }
-
-sub getFramesFor { shift->_dumpGetFramesFor(@_) }
-sub store        { shift->_dumpStore(@_)        }
-sub flush        { shift->_dumpFlush(@_)        }
 
 1;
 

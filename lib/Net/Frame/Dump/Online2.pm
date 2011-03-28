@@ -1,13 +1,11 @@
 #
-# $Id: Online2.pm 332 2011-02-16 10:42:07Z gomor $
+# $Id: Online2.pm 349 2011-03-26 13:12:44Z gomor $
 #
 package Net::Frame::Dump::Online2;
 use strict;
 use warnings;
 
-use Net::Frame::Dump qw(:consts);
-our @ISA = qw(Net::Frame::Dump);
-
+use base qw(Net::Frame::Dump);
 our @AS = qw(
    dev
    timeoutOnNext
@@ -28,7 +26,7 @@ BEGIN {
    *_check = $osname->{$^O}->[0] || \&_checkOther;
 }
 
-no strict 'vars';
+use Net::Frame::Dump qw(:consts);
 
 use Carp;
 use Net::Pcap;
@@ -39,15 +37,15 @@ sub _checkWin32 { return 1; }
 
 sub _checkOther {
    if ($>) {
-      warn("Must be EUID 0 (or equivalent) to open a device for live capture.\n");
+      warn("Must be EUID 0 (or equivalent) to open a device for live ".
+           "capture.\n");
       return;
    }
    return 1;
 }
 
 sub new {
-   my $int = getRandom32bitsInt();
-   my $self = shift->_dumpNew(
+   my $self = shift->SUPER::new(
       timeoutOnNext => 3,
       timeout       => 0,
       promisc       => 0,
@@ -55,7 +53,7 @@ sub new {
       @_,
    );
 
-   unless ($self->[$__dev]) {
+   if (!defined($self->dev)) {
       warn("You MUST pass `dev' attribute\n");
       return;
    }
@@ -68,13 +66,13 @@ sub start {
 
    _check() or return;
 
-   $self->[$__isRunning] = 1;
+   $self->isRunning(1);
 
    my $err;
    my $pd = Net::Pcap::open_live(
-      $self->[$__dev],
-      $self->[$__snaplen],
-      $self->[$__promisc],
+      $self->dev,
+      $self->snaplen,
+      $self->promisc,
       100,
       \$err,
    );
@@ -85,14 +83,13 @@ sub start {
 
    my $net  = 0;
    my $mask = 0;
-   Net::Pcap::lookupnet($self->[$__dev], \$net, \$mask, \$err);
+   Net::Pcap::lookupnet($self->dev, \$net, \$mask, \$err);
    if ($err) {
       warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
-      return;
    }
 
    my $fcode;
-   if (Net::Pcap::compile($pd, \$fcode, $self->[$__filter], 0, $mask) < 0) {
+   if (Net::Pcap::compile($pd, \$fcode, $self->filter, 0, $mask) < 0) {
       warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
@@ -109,13 +106,13 @@ sub start {
    }
 
    $self->_pcapd($pd);
-   $self->_dumpGetFirstLayer;
+   $self->getFirstLayer;
 
    #$SIG{INT}  = sub { $self->_printStats };
    #$SIG{TERM} = sub { $self->_printStats };
-   #$self->cgDebugPrint(1, "dev:    [@{[$self->[$__dev]]}]\n".
-                          #"file:   [@{[$self->[$__file]]}]\n".
-                          #"filter: [@{[$self->[$__filter]]}]");
+   #$self->cgDebugPrint(1, "dev:    [@{[$self->dev]}]\n".
+                          #"file:   [@{[$self->file]}]\n".
+                          #"filter: [@{[$self->filter]}]");
 
    return 1;
 }
@@ -123,10 +120,13 @@ sub start {
 sub stop {
    my $self = shift;
 
-   return unless $self->[$__isRunning];
+   if (!$self->isRunning) {
+      return;
+   }
 
-   Net::Pcap::close($self->[$___pcapd]);
-   $self->[$__isRunning] = 0;
+   Net::Pcap::close($self->_pcapd);
+   $self->_pcapd(undef);
+   $self->isRunning(0);
 
    return 1;
 }
@@ -134,14 +134,14 @@ sub stop {
 sub getStats {
    my $self = shift;
 
-   unless ($self->[$___pcapd]) {
+   if (!defined($self->_pcapd)) {
       carp("@{[(caller(0))[3]]}: unable to get stats, no pcap descriptor ".
            "opened.\n");
       return;
    }
 
    my %stats;
-   Net::Pcap::stats($self->[$___pcapd], \%stats);
+   Net::Pcap::stats($self->_pcapd, \%stats);
    return \%stats;
 }
 
@@ -149,7 +149,7 @@ sub _printStats {
    my $self = shift;
 
    my $stats = $self->getStats;
-   Net::Pcap::close($self->[$___pcapd]);
+   Net::Pcap::close($self->_pcapd);
 
    $self->cgDebugPrint(1, 'Frames received  : '.$stats->{ps_recv});
    $self->cgDebugPrint(1, 'Frames dropped   : '.$stats->{ps_drop});
@@ -160,30 +160,33 @@ sub _printStats {
 
 sub _getNextAwaitingFrame {
    my $self = shift;
-   $self->_dumpPcapNextEx;
+   return $self->nextEx;
 }
 
 sub _nextTimeoutHandle {
    my $self = shift;
 
    # Handle timeout
-   my $thisTime = gettimeofday()      if     $self->[$__timeoutOnNext];
-   $self->[$___firstTime] = $thisTime unless $self->[$___firstTime];
+   my $thisTime = gettimeofday();
+   if ($self->timeoutOnNext && !$self->_firstTime) {
+      $self->_firstTime($thisTime);
+   }
 
-   if ($self->[$__timeoutOnNext] && $self->[$___firstTime]) {
-      if (($thisTime - $self->[$___firstTime]) > $self->[$__timeoutOnNext]) {
-         $self->[$__timeout]    = 1;
-         $self->[$___firstTime] = 0;
+   if ($self->timeoutOnNext && $self->_firstTime) {
+      if (($thisTime - $self->_firstTime) > $self->timeoutOnNext) {
+         $self->timeout(1);
+         $self->_firstTime(0);
          $self->cgDebugPrint(1, "Timeout occured");
          return;
       }
    }
+
    return 1;
 }
 
-sub _nextTimeoutReset { shift->[$___firstTime] = 0 }
+sub _nextTimeoutReset { shift->_firstTime(0) }
 
-sub timeoutReset { shift->[$__timeout] = 0 }
+sub timeoutReset { shift->timeout(0) }
 
 sub next {
    my $self = shift;
@@ -195,10 +198,6 @@ sub next {
 
    return $frame;
 }
-
-sub getFramesFor { shift->_dumpGetFramesFor(@_) }
-sub store        { shift->_dumpStore(@_)        }
-sub flush        { shift->_dumpFlush(@_)        }
 
 1;
 

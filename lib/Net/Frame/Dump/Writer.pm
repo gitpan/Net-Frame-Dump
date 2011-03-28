@@ -1,75 +1,87 @@
 #
-# $Id: Writer.pm 328 2011-01-13 10:19:33Z gomor $
+# $Id: Writer.pm 350 2011-03-28 17:34:02Z gomor $
 #
 package Net::Frame::Dump::Writer;
 use strict;
 use warnings;
 
-use Net::Frame::Dump qw(:consts);
-our @ISA = qw(Net::Frame::Dump);
+use base qw(Net::Frame::Dump);
+our @AS = qw(
+   append
+   _fd
+);
 __PACKAGE__->cgBuildIndices;
+__PACKAGE__->cgBuildAccessorsScalar(\@AS);
 
-no strict 'vars';
+use Net::Frame::Dump qw(:consts);
 
 use Carp;
-use Net::Pcap;
 
 sub new {
-   shift->_dumpNew(
+   my $self = shift->SUPER::new(
       firstLayer => 'RAW',
+      append     => 0,
+      overwrite  => 0,
       @_,
    );
+
+   return $self;
 }
 
 my $mapLinks = {
-   NULL => NF_DUMP_LAYER_NULL(),
-   ETH  => NF_DUMP_LAYER_ETH(),
-   RAW  => NF_DUMP_LAYER_RAW(),
-   SLL  => NF_DUMP_LAYER_SLL(),
-   PPP  => NF_DUMP_LAYER_PPP(),
+   'NULL'            => NF_DUMP_LAYER_NULL(),
+   'ETH'             => NF_DUMP_LAYER_ETH(),
+   'PPP'             => NF_DUMP_LAYER_PPP(),
+   'RAW'             => NF_DUMP_LAYER_RAW(),
+   '80211'           => NF_DUMP_LAYER_80211(),
+   'SLL'             => NF_DUMP_LAYER_SLL(),
+   '80211::Radiotap' => NF_DUMP_LAYER_80211_RADIOTAP(),
+   'ERF'             => NF_DUMP_LAYER_ERF(),
 };
 
 sub _getPcapHeader {
    my $self = shift;
 
-   my $val = $mapLinks->{$self->[$__firstLayer]} or do {
+   my $dlt = $mapLinks->{$self->firstLayer} or do {
       warn("Can't get pcap header information for this layer type\n");
       return;
    };
 
-   # 24 bytes header
-   "\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00".
-   "\x00\x00\x00\x00\xdc\x05\x00\x00".
-   pack('C', $val).
-   "\x00\x00\x00";
+   # http://wiki.wireshark.org/Development/LibpcapFileFormat
+   return CORE::pack('VvvVVVV',
+      0xa1b2c3d4, # magic number
+      2,          # major version number
+      4,          # minor version number
+      0,          # GMT to local correction
+      0,          # accuracy of timestamps
+      1500,       # max length of captured packets, in octets
+      $dlt,       # data link type
+   );
 }
 
 sub _openFile {
    my $self = shift;
 
-   my $file = $self->[$__file];
-   my $hdr  = $self->_getPcapHeader;
-   open(my $fh, '>', $file) or do {
-      warn("@{[(caller(0))[3]]}: open: $file: $!\n");
-      return;
-   };
-   syswrite($fh, $hdr, length($hdr));
-   close($fh);
-
-   my $err;
-   my $pcapd = Net::Pcap::open_offline($file, \$err);
-   unless ($pcapd) {
-      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-           "$file: $err\n");
-      return;
+   my $file = $self->file;
+   if (-f $self->file && $self->append) {
+      open(my $fd, '>>', $file) or do {
+         warn("@{[(caller(0))[3]]}: open[append]: $file: $!\n");
+         return;
+      };
+      $self->_fd($fd);
    }
-   $self->[$___pcapd] = $pcapd;
-
-   $self->[$___dumper] = Net::Pcap::dump_open($pcapd, $file);
-   unless ($self->[$___dumper]) {
-      warn("@{[(caller(0))[3]]}: Net::Pcap::dump_open: ".
-           Net::Pcap::geterr($pcapd)."\n");
-      return;
+   elsif (!-f $self->file || $self->overwrite) {
+      my $hdr = $self->_getPcapHeader;
+      open(my $fd, '>', $file) or do {
+         warn("@{[(caller(0))[3]]}: open[overwrite]: $file: $!\n");
+         return;
+      };
+      my $r = syswrite($fd, $hdr, length($hdr));
+      if (!defined($r)) {
+         warn("@{[(caller(0))[3]]}: syswrite: $file: $!\n");
+         return;
+      }
+      $self->_fd($fd);
    }
 
    return 1;
@@ -78,11 +90,11 @@ sub _openFile {
 sub start {
    my $self = shift;
 
-   $self->[$__isRunning] = 1;
+   $self->isRunning(1);
 
-   if (-f $self->[$__file] && ! $self->[$__overwrite]) {
+   if (-f $self->file && !$self->overwrite && !$self->append) {
       warn("We will not overwrite a file by default. Use `overwrite' ".
-           "attribute to do it\n");
+           "attribute to do it or use `append' mode\n");
       return;
    }
 
@@ -94,12 +106,16 @@ sub start {
 sub stop {
    my $self = shift;
 
-   return unless $self->[$__isRunning];
+   if (!$self->isRunning) {
+      return;
+   }
 
-   Net::Pcap::dump_close($self->[$___dumper]);
+   if (defined($self->_fd)) {
+      close($self->_fd);
+      $self->_fd(undef);
+   }
 
-   Net::Pcap::close($self->[$___pcapd]);
-   $self->[$__isRunning] = 0;
+   $self->isRunning(0);
 
    return 1;
 }
@@ -108,19 +124,31 @@ sub write {
    my $self = shift;
    my ($h) = @_;
 
-   my $len = length($h->{raw});
+   if (!defined($self->_fd)) {
+      warn("@{[(caller(0))[3]]}: file @{[$self->file]} not open for ".
+           "writing\n");
+      return;
+   }
 
-   # Create pcap header
-   my ($sec, $usec) = split('\.', $h->{timestamp});
-   my $hdr = {
-      len     => $len,
-      caplen  => $len,
-      tv_sec  => $sec,
-      tv_usec => $usec,
-   };
+   my $raw = $h->{raw};
+   my $ts  = $h->{timestamp};
+   my $len = length($raw);
 
-   Net::Pcap::pcap_dump($self->[$___dumper], $hdr, $h->{raw});
-   Net::Pcap::dump_flush($self->[$___dumper]);
+   # Create record header
+   my ($sec, $usec) = split('\.', $ts);
+   my $recHdr = CORE::pack('VVVV',
+      $sec,
+      $usec,
+      $len,
+      $len,
+   );
+   my $r = syswrite($self->_fd, $recHdr.$raw, length($recHdr.$raw));
+   if (!defined($r)) {
+      warn("@{[(caller(0))[3]]}: syswrite: @{[$self->file]}: $!\n");
+      return;
+   }
+
+   return $r;
 }
 
 1;
@@ -163,6 +191,10 @@ Name of the .pcap file to generate.
 =item B<overwrite>
 
 Overwrites a .pcap file that already exists. Default to not.
+
+=item B<append>
+
+Append new frames to an existing pcap file. Create it if does not exists yet.
 
 =item B<firstLayer>
 

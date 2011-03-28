@@ -1,14 +1,13 @@
 #
-# $Id: Dump.pm 332 2011-02-16 10:42:07Z gomor $
+# $Id: Dump.pm 349 2011-03-26 13:12:44Z gomor $
 #
 package Net::Frame::Dump;
-use strict; use warnings;
+use strict;
+use warnings;
 
-our $VERSION = '1.08';
+our $VERSION = '1.09';
 
-use Class::Gomor::Array;
-use Exporter;
-our @ISA = qw(Class::Gomor::Array Exporter);
+use base qw(Class::Gomor::Array Exporter);
 
 our %EXPORT_TAGS = (
    consts => [qw(
@@ -19,19 +18,21 @@ our %EXPORT_TAGS = (
       NF_DUMP_LAYER_PPP
       NF_DUMP_LAYER_80211_RADIOTAP
       NF_DUMP_LAYER_80211
+      NF_DUMP_LAYER_ERF
    )],
 );
 our @EXPORT_OK = (
    @{$EXPORT_TAGS{consts}},
 );
 
-use constant NF_DUMP_LAYER_NULL => 0;
-use constant NF_DUMP_LAYER_ETH  => 1;
-use constant NF_DUMP_LAYER_PPP  => 9;
-use constant NF_DUMP_LAYER_RAW  => 12;
-use constant NF_DUMP_LAYER_80211      => 105;
-use constant NF_DUMP_LAYER_SLL        => 113;
+use constant NF_DUMP_LAYER_NULL           => 0;
+use constant NF_DUMP_LAYER_ETH            => 1;
+use constant NF_DUMP_LAYER_PPP            => 9;
+use constant NF_DUMP_LAYER_RAW            => 12;
+use constant NF_DUMP_LAYER_80211          => 105;
+use constant NF_DUMP_LAYER_SLL            => 113;
 use constant NF_DUMP_LAYER_80211_RADIOTAP => 127;
+use constant NF_DUMP_LAYER_ERF            => 175;
 
 our @AS = qw(
    file
@@ -56,12 +57,8 @@ use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Net::Frame::Layer qw(:consts :subs);
 
-our $Errbuf;
-
-sub _dumpNew {
-   my $int = getRandom32bitsInt();
-   shift->SUPER::new(
-      file          => "netframe-tmp-$$.$int.pcap",
+sub new {
+   my $self = shift->SUPER::new(
       filter        => '',
       overwrite     => 0,
       isRunning     => 0,
@@ -70,107 +67,22 @@ sub _dumpNew {
       _framesStored => {},
       @_,
    );
+
+   if (!defined($self->file)) {
+      my $int = getRandom32bitsInt();
+      $self->file("netframe-tmp-$$.$int.pcap");
+   }
+
+   return $self;
 }
 
-sub _dumpFlush {
+sub flush {
    my $self = shift;
    $self->frames([]);
    $self->_framesStored({});
 }
 
-sub _dumpStore {
-   my $self = shift;
-   my ($oSimple) = @_;
-
-   $self->_dumpFramesStored($oSimple);
-
-   my @frames = $self->frames;
-   push @frames, $oSimple;
-   $self->frames(\@frames);
-}
-
-sub _getTimestamp {
-   my $self = shift;
-   my ($hdr) = @_;
-   $hdr->{tv_sec}.'.'.sprintf("%06d", $hdr->{tv_usec});
-}
-
-sub _setTimestamp {
-   my $self = shift;
-   my @time = Time::HiRes::gettimeofday();
-   $time[0].'.'.sprintf("%06d", $time[1]);
-}
-
-my $mapLinks = {
-   NF_DUMP_LAYER_NULL() => 'NULL',
-   NF_DUMP_LAYER_ETH()  => 'ETH',
-   NF_DUMP_LAYER_RAW()  => 'RAW',
-   NF_DUMP_LAYER_SLL()  => 'SLL',
-   NF_DUMP_LAYER_PPP()  => 'PPP',
-   NF_DUMP_LAYER_80211()          => '80211',
-   NF_DUMP_LAYER_80211_RADIOTAP() => '80211::Radiotap',
-};
-
-sub _dumpGetFirstLayer {
-   my $self = shift;
-   my $link = Net::Pcap::datalink($self->_pcapd);
-   $self->firstLayer($mapLinks->{$link} || NF_LAYER_UNKNOWN);
-}
-
-sub _dumpPcapNext {
-   my $self = shift;
-
-   my %hdr;
-   if (my $raw = Net::Pcap::next($self->_pcapd, \%hdr)) {
-      my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
-                                    : $self->_setTimestamp;
-      return {
-         firstLayer => $self->firstLayer,
-         timestamp  => $ts,
-         raw        => $raw,
-      };
-   }
-
-   return;
-}
-
-sub _dumpPcapNextEx {
-   my $self = shift;
-
-   my %hdr;
-   my $raw;
-   my $r;
-   if ($r = Net::Pcap::next_ex($self->_pcapd, \%hdr, \$raw) > 0) {
-      my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
-                                    : $self->_setTimestamp;
-      return {
-         firstLayer => $self->firstLayer,
-         timestamp  => $ts,
-         raw        => $raw,
-      };
-   }
-
-   return $r;
-}
-
-sub _dumpGetFramesFor {
-   my $self = shift;
-   my ($oSimple) = @_;
-
-   my $results;
-   my $key = $oSimple->getKeyReverse;
-   push @$results, @{$self->_framesStored->{$key}}
-      if exists $self->_framesStored->{$key};
-
-   # Add also ICMPv4
-   if (exists $self->_framesStored->{ICMPv4}) {
-      push @$results, @{$self->_framesStored->{ICMPv4}};
-   }
-
-   return $results ? @$results : ();
-}
-
-sub _dumpFramesStored {
+sub _addStore {
    my $self = shift;
    my ($oSimple) = @_;
 
@@ -190,19 +102,122 @@ sub _dumpFramesStored {
    return $self->_framesStored;
 }
 
+sub store {
+   my $self = shift;
+   my ($oSimple) = @_;
+
+   $self->_addStore($oSimple);
+
+   my @frames = $self->frames;
+   push @frames, $oSimple;
+   return $self->frames(\@frames);
+}
+
+sub _getTimestamp {
+   my $self = shift;
+   my ($hdr) = @_;
+   $hdr->{tv_sec}.'.'.sprintf("%06d", $hdr->{tv_usec});
+}
+
+sub _setTimestamp {
+   my $self = shift;
+   my @time = Time::HiRes::gettimeofday();
+   $time[0].'.'.sprintf("%06d", $time[1]);
+}
+
+my $mapLinks = {
+   NF_DUMP_LAYER_NULL()           => 'NULL',
+   NF_DUMP_LAYER_ETH()            => 'ETH',
+   NF_DUMP_LAYER_RAW()            => 'RAW',
+   NF_DUMP_LAYER_SLL()            => 'SLL',
+   NF_DUMP_LAYER_PPP()            => 'PPP',
+   NF_DUMP_LAYER_80211()          => '80211',
+   NF_DUMP_LAYER_80211_RADIOTAP() => '80211::Radiotap',
+   NF_DUMP_LAYER_ERF()            => 'ERF',
+};
+
+sub getFirstLayer {
+   my $self = shift;
+   my $link = Net::Pcap::datalink($self->_pcapd);
+   $self->firstLayer($mapLinks->{$link} || NF_LAYER_UNKNOWN);
+}
+
+sub next {
+   my $self = shift;
+
+   my %hdr;
+   if (my $raw = Net::Pcap::next($self->_pcapd, \%hdr)) {
+      my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
+                                    : $self->_setTimestamp;
+      return {
+         firstLayer => $self->firstLayer,
+         timestamp  => $ts,
+         raw        => $raw,
+      };
+   }
+
+   return;
+}
+
+sub nextEx {
+   my $self = shift;
+
+   my %hdr;
+   my $raw;
+   my $r;
+   if ($r = Net::Pcap::next_ex($self->_pcapd, \%hdr, \$raw) > 0) {
+      my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
+                                    : $self->_setTimestamp;
+      return {
+         firstLayer => $self->firstLayer,
+         timestamp  => $ts,
+         raw        => $raw,
+      };
+   }
+
+   return $r;
+}
+
+sub getFramesFor {
+   my $self = shift;
+   my ($oSimple) = @_;
+
+   my $results;
+   my $key = $oSimple->getKeyReverse;
+   push @$results, @{$self->_framesStored->{$key}}
+      if exists $self->_framesStored->{$key};
+
+   # Add also ICMPv4
+   if (exists $self->_framesStored->{ICMPv4}) {
+      push @$results, @{$self->_framesStored->{ICMPv4}};
+   }
+
+   return $results ? @$results : ();
+}
+
 1;
 
 __END__
 
 =head1 NAME
 
-Net::Frame::Dump - tcpdump like implementation
+Net::Frame::Dump - base-class for a tcpdump like implementation
 
 =head1 DESCRIPTION
 
 B<Net::Frame::Dump> is the base class for all dump modules. With them, you can open a device for live capture, for offline analysis, or for creating a pcap file.
 
 See B<Net::Frame::Dump::Offline>, B<Net::Frame::Dump::Online>, B<Net::Frame::Dump::Writer> for specific usage.
+
+=head1 METHODS
+
+=over 4
+
+=item B<new> (%h)
+
+Base-class object constructor.
+
+=back
 
 =head1 CONSTANTS
 

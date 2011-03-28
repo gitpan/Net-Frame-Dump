@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:               Net-Frame-Dump
-version:            1.08
-abstract:           tcpdump like implementation
+version:            1.09
+abstract:           base-class for a tcpdump like implementation
 author:
     - GomoR <gomor-cpan_at_gomor.org>
 license:            artistic

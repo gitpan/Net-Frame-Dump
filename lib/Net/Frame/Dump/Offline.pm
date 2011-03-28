@@ -1,59 +1,59 @@
 #
-# $Id: Offline.pm 328 2011-01-13 10:19:33Z gomor $
+# $Id: Offline.pm 349 2011-03-26 13:12:44Z gomor $
 #
 package Net::Frame::Dump::Offline;
 use strict;
 use warnings;
 
-use Net::Frame::Dump qw(:consts);
-our @ISA = qw(Net::Frame::Dump);
+use base qw(Net::Frame::Dump);
 __PACKAGE__->cgBuildIndices;
 
-no strict 'vars';
+use Net::Frame::Dump qw(:consts);
 
 use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 
-sub new { shift->_dumpNew(@_) }
-
 sub _openFile {
    my $self = shift;
 
    my $err;
-   $self->[$___pcapd] = Net::Pcap::open_offline($self->[$__file], \$err);
-   unless ($self->[$___pcapd]) {
+   my $pcapd = Net::Pcap::open_offline($self->file, \$err);
+   if (!defined($pcapd)) {
       warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-           "@{[$self->[$__file]]}: $err\n");
+           "@{[$self->file]}: $err\n");
       return;
    }
+   $self->_pcapd($pcapd);
 
-   $self->_dumpGetFirstLayer;
+   return $self->getFirstLayer;
 }
 
 sub _setFilter {
    my $self = shift;
-   my $str = $self->[$__filter];
 
-   return unless $str;
+   my $str = $self->filter;
+   if (!defined($str)) {
+      return;
+   }
 
    my $filter;
-   Net::Pcap::compile($self->[$___pcapd], \$filter, $str, 0, 0);
-   unless ($filter) {
+   Net::Pcap::compile($self->_pcapd, \$filter, $str, 0, 0);
+   if (!defined($filter)) {
       warn("@{[(caller(0))[3]]}: Net::Pcap::compile: error\n");
       return;
    }
 
-   Net::Pcap::setfilter($self->[$___pcapd], $filter);
+   Net::Pcap::setfilter($self->_pcapd, $filter);
 }
 
 sub start {
    my $self = shift;
 
-   $self->[$__isRunning] = 1;
+   $self->isRunning(1);
 
-   if (! -f $self->[$__file]) {
-      warn("File does not exists: ".$self->[$__file]."\n");
+   if (! -f $self->file) {
+      warn("File does not exists: ".$self->file."\n");
       return;
    }
 
@@ -66,18 +66,16 @@ sub start {
 sub stop {
    my $self = shift;
 
-   return unless $self->[$__isRunning];
+   if (!$self->isRunning) {
+      return;
+   }
 
-   Net::Pcap::close($self->[$___pcapd]);
-   $self->[$__isRunning] = 0;
+   Net::Pcap::close($self->_pcapd);
+   $self->_pcapd(undef);
+   $self->isRunning(0);
 
    return 1;
 }
-
-sub next         { shift->_dumpPcapNext(@_)     }
-sub getFramesFor { shift->_dumpGetFramesFor(@_) }
-sub store        { shift->_dumpStore(@_)        }
-sub flush        { shift->_dumpFlush(@_)        }
 
 1;
 
