@@ -1,5 +1,5 @@
 #
-# $Id: Writer.pm 350 2011-03-28 17:34:02Z gomor $
+# $Id: Writer.pm 353 2012-09-12 18:15:33Z gomor $
 #
 package Net::Frame::Dump::Writer;
 use strict;
@@ -14,8 +14,6 @@ __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
 
 use Net::Frame::Dump qw(:consts);
-
-use Carp;
 
 sub new {
    my $self = shift->SUPER::new(
@@ -43,7 +41,8 @@ sub _getPcapHeader {
    my $self = shift;
 
    my $dlt = $mapLinks->{$self->firstLayer} or do {
-      warn("Can't get pcap header information for this layer type\n");
+      print("[-] ".__PACKAGE__.": Can't get pcap header information for ".
+            "this layer type\n");
       return;
    };
 
@@ -65,7 +64,7 @@ sub _openFile {
    my $file = $self->file;
    if (-f $self->file && $self->append) {
       open(my $fd, '>>', $file) or do {
-         warn("@{[(caller(0))[3]]}: open[append]: $file: $!\n");
+         print("[-] ".__PACKAGE__.": open[append]: $file: $!\n");
          return;
       };
       $self->_fd($fd);
@@ -73,12 +72,12 @@ sub _openFile {
    elsif (!-f $self->file || $self->overwrite) {
       my $hdr = $self->_getPcapHeader;
       open(my $fd, '>', $file) or do {
-         warn("@{[(caller(0))[3]]}: open[overwrite]: $file: $!\n");
+         print("[-] ".__PACKAGE__.": open[overwrite]: $file: $!\n");
          return;
       };
       my $r = syswrite($fd, $hdr, length($hdr));
       if (!defined($r)) {
-         warn("@{[(caller(0))[3]]}: syswrite: $file: $!\n");
+         print("[-] ".__PACKAGE__.": syswrite: $file: $!\n");
          return;
       }
       $self->_fd($fd);
@@ -93,8 +92,8 @@ sub start {
    $self->isRunning(1);
 
    if (-f $self->file && !$self->overwrite && !$self->append) {
-      warn("We will not overwrite a file by default. Use `overwrite' ".
-           "attribute to do it or use `append' mode\n");
+      print("[-] ".__PACKAGE__.": We will not overwrite a file by default. ".
+            "Use `overwrite' attribute to do it or use `append' mode\n");
       return;
    }
 
@@ -125,7 +124,7 @@ sub write {
    my ($h) = @_;
 
    if (!defined($self->_fd)) {
-      warn("@{[(caller(0))[3]]}: file @{[$self->file]} not open for ".
+      print("[-] ".__PACKAGE__.": file @{[$self->file]} not open for ".
            "writing\n");
       return;
    }
@@ -144,7 +143,7 @@ sub write {
    );
    my $r = syswrite($self->_fd, $recHdr.$raw, length($recHdr.$raw));
    if (!defined($r)) {
-      warn("@{[(caller(0))[3]]}: syswrite: @{[$self->file]}: $!\n");
+      print("[-] ".__PACKAGE__.": syswrite: @{[$self->file]}: $!\n");
       return;
    }
 
@@ -240,7 +239,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2011, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

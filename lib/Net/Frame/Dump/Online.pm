@@ -1,5 +1,5 @@
 #
-# $Id: Online.pm 349 2011-03-26 13:12:44Z gomor $
+# $Id: Online.pm 353 2012-09-12 18:15:33Z gomor $
 #
 package Net::Frame::Dump::Online;
 use strict;
@@ -36,7 +36,6 @@ BEGIN {
 
 use Net::Frame::Dump qw(:consts);
 
-use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Storable qw(lock_store lock_retrieve);
@@ -46,8 +45,8 @@ sub _checkWin32 { return 1; }
 
 sub _checkOther {
    if ($>) {
-      warn("Must be EUID 0 (or equivalent) to open a device for live capture.\n");
-      return;
+      die("[-]: Net::Frame::Dump::Online: Must be EUID 0 (or equivalent) ".
+          "to open a device for live capture\n");
    }
    return 1;
 }
@@ -79,7 +78,7 @@ sub new {
    };
 
    if (!defined($self->dev)) {
-      warn("You MUST pass `dev' attribute\n");
+      print("[-] ".__PACKAGE__.": You MUST pass `dev' attribute\n");
       return;
    }
 
@@ -88,7 +87,7 @@ sub new {
 
 sub _sStore {
    lock_store(\$_[1], $_[0]->_sName) or do {
-      warn("@{[(caller(0))[3]]}: lock_store: @{[$_[0]->_sName]}: $!\n");
+      print("[-] ".__PACKAGE__.": lock_store: @{[$_[0]->_sName]}: $!\n");
       return;
    };
    return 1;
@@ -103,7 +102,7 @@ sub _sWaitFile {
    my $thisTime  = $startTime;
    while (! -f $self->_sName) {
       if ($thisTime - $startTime > 10) {
-         warn("@{[(caller(0))[3]]}: too long for file creation: ".
+         print("[-] ".__PACKAGE__.": too long for file creation: ".
               $self->_sName."\n");
          return;
       }
@@ -122,8 +121,8 @@ sub _sWaitFileSize {
    while (! ((stat($self->_sName))[7] > 0)) {
       if ($thisTime - $startTime > 10) {
          $self->_clean;
-         warn("@{[(caller(0))[3]]}: too long for file creation2: ".
-              $self->_sName."\n");
+         print("[-] ".__PACKAGE__.": too long for file creation2: ".
+               $self->_sName."\n");
          return;
       }
       $thisTime = gettimeofday();
@@ -143,7 +142,7 @@ sub _startOnRecv {
       \$err,
    );
    unless ($pd) {
-      warn("@{[(caller(0))[3]]}: open_live: $err\n");
+      print("[-] ".__PACKAGE__.": open_live: $err\n");
       return;
    }
    $self->_pcapd($pd);
@@ -152,17 +151,17 @@ sub _startOnRecv {
    my $mask = 0;
    Net::Pcap::lookupnet($self->dev, \$net, \$mask, \$err);
    if ($err) {
-      warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
+      print("[!] ".__PACKAGE__.": lookupnet: $err\n");
    }
 
    my $fcode;
    if (Net::Pcap::compile($pd, \$fcode, $self->filter, 0, $mask) < 0) {
-      warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      print("[-] ".__PACKAGE__.": compile: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
 
    if (Net::Pcap::setfilter($pd, $fcode) < 0) {
-      warn("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      print("[-] ".__PACKAGE__.": setfilter: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
 
@@ -197,8 +196,8 @@ sub start {
    $self->isRunning(1);
 
    if (-f $self->file && !$self->overwrite) {
-      warn("We will not overwrite a file by default. Use `overwrite' ".
-           "attribute to do it.\n");
+      print("[-] ".__PACKAGE__."We will not overwrite a file by default. ".
+            "Use `overwrite' attribute to do it.\n");
       return;
    }
 
@@ -256,7 +255,7 @@ sub getStats {
    my $self = shift;
 
    if (!defined($self->_pcapd)) {
-      carp("@{[(caller(0))[3]]}: unable to get stats, no pcap descriptor ".
+      print("[-] ".__PACKAGE__.": unable to get stats, no pcap descriptor ".
            "opened.\n");
       return;
    }
@@ -291,7 +290,7 @@ sub _startTcpdump {
       \$err,
    );
    unless ($pd) {
-      warn("@{[(caller(0))[3]]}: open_live: $err\n");
+      print("[-] ".__PACKAGE__.": open_live: $err\n");
       return;
    }
 
@@ -299,29 +298,29 @@ sub _startTcpdump {
    my $mask = 0;
    Net::Pcap::lookupnet($self->dev, \$net, \$mask, \$err);
    if ($err) {
-      warn("@{[(caller(0))[3]]}: lookupnet: $err\n");
+      print("[!] ".__PACKAGE__.": lookupnet: $err\n");
    }
 
    my $fcode;
    if (Net::Pcap::compile($pd, \$fcode, $self->filter, 0, $mask) < 0) {
-      warn("@{[(caller(0))[3]]}: compile: ". Net::Pcap::geterr($pd). "\n");
+      print("[-] ".__PACKAGE__.": compile: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
 
    if (Net::Pcap::setfilter($pd, $fcode) < 0) {
-      warn("@{[(caller(0))[3]]}: setfilter: ". Net::Pcap::geterr($pd). "\n");
+      print("[-] ".__PACKAGE__.": setfilter: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
 
    my $p = Net::Pcap::dump_open($pd, $self->file);
    unless ($p) {
-      warn("@{[(caller(0))[3]]}: dump_open: ". Net::Pcap::geterr($pd). "\n");
+      print("[-] ".__PACKAGE__.": dump_open: ". Net::Pcap::geterr($pd). "\n");
       return;
    }
    Net::Pcap::dump_flush($p);
 
    my $pid = fork();
-   croak("@{[(caller(0))[3]]}: fork: $!\n") unless defined $pid;
+   die("[-] ".__PACKAGE__.": fork: $!\n") unless defined $pid;
    if ($pid) {   # Parent
       $self->_son(0);
       $self->_pid($pid);
@@ -366,7 +365,7 @@ sub _openFile {
    my $err;
    my $pcapd = Net::Pcap::open_offline($self->file, \$err);
    if (!defined($pcapd)) {
-      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
+      print("[-] ".__PACKAGE__.": Net::Pcap::open_offline: ".
            "@{[$self->file]}: $err\n");
       return;
    }
@@ -384,7 +383,7 @@ sub _getNextAwaitingFrame {
    return if ($new <= $last);
 
    $self->_sDataAwaiting($self->_sDataAwaiting + 1);
-   return $self->next;
+   return $self->SUPER::next;
 }
 
 sub _nextTimeoutHandle {
@@ -632,7 +631,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2011, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

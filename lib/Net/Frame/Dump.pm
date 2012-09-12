@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm 349 2011-03-26 13:12:44Z gomor $
+# $Id: Dump.pm 353 2012-09-12 18:15:33Z gomor $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.09';
+our $VERSION = '1.10';
 
 use base qw(Class::Gomor::Array Exporter);
 
@@ -52,7 +52,6 @@ __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
 __PACKAGE__->cgBuildAccessorsArray(\@AA);
 
-use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Net::Frame::Layer qw(:consts :subs);
@@ -253,7 +252,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2011, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Frame::Dump.
 
+1.10 Wed Sep 12 20:15:09 CEST 2012
+   - bugfix: Online: use SUPER::next() instead of next()
+   - update: error messages scheme changed
+   - update: copyright notice
+
 1.09 Mon Mar 28 19:33:24 CEST 2011
    - new: added support for ERF data link type
    - new: added support to append data to a pcap file in Writer mode

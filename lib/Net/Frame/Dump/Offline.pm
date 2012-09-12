@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm 349 2011-03-26 13:12:44Z gomor $
+# $Id: Offline.pm 353 2012-09-12 18:15:33Z gomor $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -10,7 +10,6 @@ __PACKAGE__->cgBuildIndices;
 
 use Net::Frame::Dump qw(:consts);
 
-use Carp;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 
@@ -20,8 +19,8 @@ sub _openFile {
    my $err;
    my $pcapd = Net::Pcap::open_offline($self->file, \$err);
    if (!defined($pcapd)) {
-      warn("@{[(caller(0))[3]]}: Net::Pcap::open_offline: ".
-           "@{[$self->file]}: $err\n");
+      print("[-] ".__PACKAGE__.": Net::Pcap::open_offline: ".
+            "@{[$self->file]}: $err\n");
       return;
    }
    $self->_pcapd($pcapd);
@@ -40,7 +39,7 @@ sub _setFilter {
    my $filter;
    Net::Pcap::compile($self->_pcapd, \$filter, $str, 0, 0);
    if (!defined($filter)) {
-      warn("@{[(caller(0))[3]]}: Net::Pcap::compile: error\n");
+      print("[-] ".__PACKAGE__.": Net::Pcap::compile: error\n");
       return;
    }
 
@@ -53,7 +52,7 @@ sub start {
    $self->isRunning(1);
 
    if (! -f $self->file) {
-      warn("File does not exists: ".$self->file."\n");
+      print("[-] ".__PACKAGE__.": File does not exists: ".$self->file."\n");
       return;
    }
 
@@ -200,7 +199,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2011, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

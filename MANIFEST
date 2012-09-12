@@ -17,4 +17,3 @@ lib/Net/Frame/Dump/Writer.pm
 t/01-use.t
 t/02-pod-coverage.t
 t/03-test-pod.t
-META.yml                                 Module meta-data (added by MakeMaker)
