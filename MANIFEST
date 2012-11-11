@@ -8,6 +8,8 @@ examples/dump-offline.pl
 examples/dump-online-1-frame.pl
 examples/dump-online-onrecv.pl
 examples/dump-online.pl
+examples/dump-online2.pl
+examples/dump-online2-saveonly.pl
 examples/dump-writer.pl
 lib/Net/Frame/Dump.pm
 lib/Net/Frame/Dump/Offline.pm
@@ -17,3 +19,5 @@ lib/Net/Frame/Dump/Writer.pm
 t/01-use.t
 t/02-pod-coverage.t
 t/03-test-pod.t
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

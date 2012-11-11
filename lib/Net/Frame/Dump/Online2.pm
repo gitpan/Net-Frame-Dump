@@ -1,5 +1,5 @@
 #
-# $Id: Online2.pm 353 2012-09-12 18:15:33Z gomor $
+# $Id: Online2.pm 355 2012-11-11 14:23:55Z gomor $
 #
 package Net::Frame::Dump::Online2;
 use strict;
@@ -12,7 +12,10 @@ our @AS = qw(
    timeout
    promisc
    snaplen
+   file
+   overwrite
    _firstTime
+   _pid
 );
 __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
@@ -48,6 +51,8 @@ sub new {
       timeout       => 0,
       promisc       => 0,
       snaplen       => 1514,
+      file          => '',
+      overwrite     => 0,
       @_,
    );
 
@@ -65,6 +70,14 @@ sub start {
    _check() or return;
 
    $self->isRunning(1);
+
+   if (length($self->file)) {
+      if (-f $self->file && ! $self->overwrite) {
+         print("[-] ".__PACKAGE__.": We will not overwrite a file by default. ".
+               "Use `overwrite' attribute to do it.\n");
+         return;
+      }
+   }
 
    my $err;
    my $pd = Net::Pcap::open_live(
@@ -97,29 +110,85 @@ sub start {
       return;
    }
 
-   my $r = Net::Pcap::setnonblock($pd, 1, \$err);
-   if ($r == -1) {
-      print("[-] ".__PACKAGE__.": setnonblock: $err\n");
-      return;
+   # Avoid nonblock mode when capture only mode chosen: don't eat 100% CPU
+   if (! length($self->file)) {
+      my $r = Net::Pcap::setnonblock($pd, 1, \$err);
+      if ($r == -1) {
+         print("[-] ".__PACKAGE__.": setnonblock: $err\n");
+         return;
+      }
    }
 
    $self->_pcapd($pd);
    $self->getFirstLayer;
 
-   #$SIG{INT}  = sub { $self->_printStats };
-   #$SIG{TERM} = sub { $self->_printStats };
-   #$self->cgDebugPrint(1, "dev:    [@{[$self->dev]}]\n".
-                          #"file:   [@{[$self->file]}]\n".
-                          #"filter: [@{[$self->filter]}]");
+   if (length($self->file)) {
+      my $pid = fork();
+      if (! defined($pid)) {
+         die("[-] ".__PACKAGE__.": fork: $!\n");
+      }
+
+      if ($pid) {   # Parent
+         $self->_pid($pid);
+         $SIG{CHLD} = 'IGNORE';
+         return 1;
+      }
+      else {   # Son
+         $self->_pid(0);
+         $self->_pcapd($pd);
+
+         my $dumper = Net::Pcap::dump_open($pd, $self->file);
+         if (! defined($dumper)) {
+            print("[-] ".__PACKAGE__.": dump_open: ".Net::Pcap::geterr($pd).
+                  "\n");
+            exit(1);
+         }
+         Net::Pcap::dump_flush($dumper);
+
+         Net::Pcap::loop($pd, -1, \&_saveCallback, [ $dumper, $self ]);
+         exit(0);
+      }
+   }
 
    return 1;
+}
+
+sub _isFather {
+   my $self = shift;
+   return $self->_pid;
+}
+
+sub _isSon {
+   my $self = shift;
+   return ! $self->_pid;
+}
+
+sub _saveCallback {
+   my ($data, $hdr, $pkt) = @_;
+   my $p    = $data->[0];
+   my $self = $data->[1];
+
+   Net::Pcap::dump($p, $hdr, $pkt);
+   Net::Pcap::dump_flush($p);
+}
+
+sub _killTcpdump {
+   my $self = shift;
+   return if $self->_isSon;
+   kill('KILL', $self->_pid);
+   $self->_pid(undef);
 }
 
 sub stop {
    my $self = shift;
 
-   if (!$self->isRunning) {
+   if (! $self->isRunning || $self->_isSon) {
       return;
+   }
+
+   # We are in capture mode
+   if (length($self->file) && $self->_isFather) {
+      $self->_killTcpdump;
    }
 
    Net::Pcap::close($self->_pcapd);
@@ -189,6 +258,11 @@ sub timeoutReset { shift->timeout(0) }
 sub next {
    my $self = shift;
 
+   if (length($self->file)) {
+      die("[-] ".__PACKAGE__.": next method not available while in ".
+          "capture mode.\n");
+   }
+
    $self->_nextTimeoutHandle or return;
 
    my $frame = $self->_getNextAwaitingFrame;
@@ -232,15 +306,13 @@ Net::Frame::Dump::Online2 - tcpdump like implementation, online mode and non-blo
    #
    # Default parameters on creation
    #
-   my $oDumpDefault = Net::Frame::Dump::Online->new(
-      dev            => undef,
-      timeoutOnNext  => 3,
-      timeout        => 0,
-      promisc        => 0,
-      filter         => '',
-      isRunning      => 0,
-      keepTimestamp  => 0,
-      frames         => [],
+   my $oDumpDefault = Net::Frame::Dump::Online2->new(
+      timeoutOnNext => 3,
+      timeout       => 0,
+      promisc       => 0,
+      snaplen       => 1514,
+      file          => '',
+      overwrite     => 0,
    );
 
 =head1 DESCRIPTION
