@@ -1,5 +1,5 @@
 #
-# $Id: Online2.pm 355 2012-11-11 14:23:55Z gomor $
+# $Id: Online2.pm 358 2012-11-13 19:16:33Z gomor $
 #
 package Net::Frame::Dump::Online2;
 use strict;
@@ -16,6 +16,7 @@ our @AS = qw(
    overwrite
    _firstTime
    _pid
+   _sel
 );
 __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
@@ -31,6 +32,7 @@ BEGIN {
 
 use Net::Frame::Dump qw(:consts);
 
+use IO::Select;
 use Net::Pcap;
 use Time::HiRes qw(gettimeofday);
 use Net::Frame::Layer qw(:subs);
@@ -117,6 +119,12 @@ sub start {
          print("[-] ".__PACKAGE__.": setnonblock: $err\n");
          return;
       }
+
+      # Gather a file descriptor to use by select()
+      my $fd  = Net::Pcap::get_selectable_fd($pd);
+      my $sel = IO::Select->new;
+      $sel->add($fd);
+      $self->_sel($sel);
    }
 
    $self->_pcapd($pd);
@@ -263,12 +271,17 @@ sub next {
           "capture mode.\n");
    }
 
-   $self->_nextTimeoutHandle or return;
+   my $sel = $self->_sel;
+   if (my @read = $sel->can_read($self->timeoutOnNext)) {
+      $self->_nextTimeoutReset;
+      my $frame = $self->_getNextAwaitingFrame;
+      return $frame;
+   }
 
-   my $frame = $self->_getNextAwaitingFrame;
-   $self->_nextTimeoutReset if $frame;
+   # If we are here, a timeout has occured
+   $self->_nextTimeoutHandle;
 
-   return $frame;
+   return;
 }
 
 1;
