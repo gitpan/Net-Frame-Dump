@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm 357 2012-11-11 17:46:53Z gomor $
+# $Id: Dump.pm 360 2012-12-02 14:44:41Z gomor $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.12';
+our $VERSION = '1.13';
 
 use base qw(Class::Gomor::Array Exporter);
 

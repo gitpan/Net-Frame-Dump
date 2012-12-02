@@ -24,4 +24,4 @@ requires:
   Net::Pcap: 0.12
   Time::HiRes: 0
   perl: 5.006001
-version: 1.12
+version: 1.13

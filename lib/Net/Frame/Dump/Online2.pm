@@ -1,5 +1,5 @@
 #
-# $Id: Online2.pm 358 2012-11-13 19:16:33Z gomor $
+# $Id: Online2.pm 360 2012-12-02 14:44:41Z gomor $
 #
 package Net::Frame::Dump::Online2;
 use strict;
@@ -17,6 +17,7 @@ our @AS = qw(
    _firstTime
    _pid
    _sel
+   _frames
 );
 __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
@@ -50,11 +51,13 @@ sub _checkOther {
 sub new {
    my $self = shift->SUPER::new(
       timeoutOnNext => 3,
-      timeout       => 0,
-      promisc       => 0,
-      snaplen       => 1514,
-      file          => '',
-      overwrite     => 0,
+      timeout => 0,
+      promisc => 0,
+      snaplen => 1514,
+      file => '',
+      overwrite => 0,
+      _firstTime => 0,
+      _frames => [],
       @_,
    );
 
@@ -271,11 +274,23 @@ sub next {
           "capture mode.\n");
    }
 
+   my $frames = $self->_frames;
+   if (@$frames > 0) {
+      $self->_nextTimeoutReset;
+      my $next = shift @$frames;
+      $self->_frames($frames);
+      return $next;
+   }
+
    my $sel = $self->_sel;
    if (my @read = $sel->can_read($self->timeoutOnNext)) {
       $self->_nextTimeoutReset;
-      my $frame = $self->_getNextAwaitingFrame;
-      return $frame;
+      while (my $frame = $self->_getNextAwaitingFrame) {
+         push @$frames, $frame;
+      }
+      my $next = shift @$frames;
+      $self->_frames($frames);
+      return $next;
    }
 
    # If we are here, a timeout has occured
