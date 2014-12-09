@@ -19,6 +19,7 @@ This module requires these other modules and libraries:
   Net::Frame
   Net::Pcap
   Time::HiRes
+  IO::Select
 
 GETTING HELP
 
@@ -30,5 +31,5 @@ COPYRIGHT AND LICENSE
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.
 
-Copyright (c) 2006-2012, Patrice <GomoR> Auffret
+Copyright (c) 2006-2014, Patrice <GomoR> Auffret
 

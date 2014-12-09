@@ -1,5 +1,5 @@
 #
-# $Id: Offline.pm 353 2012-09-12 18:15:33Z gomor $
+# $Id: Offline.pm 364 2014-11-30 11:26:27Z gomor $
 #
 package Net::Frame::Dump::Offline;
 use strict;
@@ -199,7 +199,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2014, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

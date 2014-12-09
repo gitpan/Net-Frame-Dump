@@ -1,5 +1,5 @@
 #
-# $Id: Online2.pm 360 2012-12-02 14:44:41Z gomor $
+# $Id: Online2.pm 365 2014-12-09 18:08:01Z gomor $
 #
 package Net::Frame::Dump::Online2;
 use strict;
@@ -10,14 +10,16 @@ our @AS = qw(
    dev
    timeoutOnNext
    timeout
+   maxRunTime
    promisc
    snaplen
    file
    overwrite
-   _firstTime
+   _startTime
    _pid
    _sel
    _frames
+   _timeWithoutReceiving
 );
 __PACKAGE__->cgBuildIndices;
 __PACKAGE__->cgBuildAccessorsScalar(\@AS);
@@ -56,8 +58,10 @@ sub new {
       snaplen => 1514,
       file => '',
       overwrite => 0,
-      _firstTime => 0,
+      maxRunTime => 0,
+      _startTime => 0,
       _frames => [],
+      _timeWithoutReceiving => 0,
       @_,
    );
 
@@ -89,7 +93,7 @@ sub start {
       $self->dev,
       $self->snaplen,
       $self->promisc,
-      100,
+      100, # 100 ms timeout
       \$err,
    );
    unless ($pd) {
@@ -115,19 +119,24 @@ sub start {
       return;
    }
 
-   # Avoid nonblock mode when capture only mode chosen: don't eat 100% CPU
    if (! length($self->file)) {
-      my $r = Net::Pcap::setnonblock($pd, 1, \$err);
-      if ($r == -1) {
-         print("[-] ".__PACKAGE__.": setnonblock: $err\n");
-         return;
-      }
+      #my $r = Net::Pcap::setnonblock($pd, 1, \$err);
+      #if ($r == -1) {
+         #print("[-] ".__PACKAGE__.": setnonblock: $err\n");
+         #return;
+      #}
 
       # Gather a file descriptor to use by select()
-      my $fd  = Net::Pcap::get_selectable_fd($pd);
+      # Avoid eating 100% CPU
+      my $fd = Net::Pcap::get_selectable_fd($pd);
+      if ($fd < 0) {
+         print("[-] ".__PACKAGE__.": get_selectable_fd failed\n");
+         return;
+      }
       my $sel = IO::Select->new;
       $sel->add($fd);
       $self->_sel($sel);
+      $self->_startTime(gettimeofday());
    }
 
    $self->_pcapd($pd);
@@ -236,35 +245,34 @@ sub _printStats {
    return 1;
 }
 
-sub _getNextAwaitingFrame {
-   my $self = shift;
-   return $self->nextEx;
-}
-
-sub _nextTimeoutHandle {
+sub timeoutReset {
    my $self = shift;
 
-   # Handle timeout
-   my $thisTime = gettimeofday();
-   if ($self->timeoutOnNext && !$self->_firstTime) {
-      $self->_firstTime($thisTime);
-   }
-
-   if ($self->timeoutOnNext && $self->_firstTime) {
-      if (($thisTime - $self->_firstTime) > $self->timeoutOnNext) {
-         $self->timeout(1);
-         $self->_firstTime(0);
-         $self->cgDebugPrint(1, "Timeout occured");
-         return;
-      }
-   }
+   $self->_timeWithoutReceiving(0);
+   $self->timeout(0);
 
    return 1;
 }
 
-sub _nextTimeoutReset { shift->_firstTime(0) }
+sub _dispatch {
+   my ($user, $header, $packet) = @_;
 
-sub timeoutReset { shift->timeout(0) }
+   my $self = $user->{self};
+   my $frames = $user->{frames};
+
+   my $ts = $self->keepTimestamp ? $self->_getTimestamp($header)
+                                 : $self->_setTimestamp;
+
+   my $frame = {
+      firstLayer => 'ETH',
+      timestamp => $ts,
+      raw => $packet,
+   };
+
+   push @$frames, $frame;
+
+   $user->{frames} = $frames;
+}
 
 sub next {
    my $self = shift;
@@ -274,27 +282,59 @@ sub next {
           "capture mode.\n");
    }
 
+   # We look ar our internal ring buffer
    my $frames = $self->_frames;
    if (@$frames > 0) {
-      $self->_nextTimeoutReset;
       my $next = shift @$frames;
       $self->_frames($frames);
       return $next;
    }
 
+   # If we reach here, we don't have frames anymore in our buffer,
+   # we ask for more except if we have a timeout condition.
+   if ($self->timeout) {
+      return;
+   }
+
+   # We fetch new awaiting frames, if no timeout occured yet.
+   # can_read will return as soon as there is something to read,
+   # or will block if nothing to read for timeoutOnNext seconds.
    my $sel = $self->_sel;
-   if (my @read = $sel->can_read($self->timeoutOnNext)) {
-      $self->_nextTimeoutReset;
-      while (my $frame = $self->_getNextAwaitingFrame) {
-         push @$frames, $frame;
-      }
-      my $next = shift @$frames;
-      $self->_frames($frames);
-      return $next;
+   my $some_received = 0;
+   my $thisTime = gettimeofday();
+
+   # Gather all available frames
+   my $h = { self => $self, frames => $frames };
+   Net::Pcap::pcap_dispatch($self->_pcapd, -1, \&_dispatch, $h);
+   $some_received = scalar(@{$h->{frames}});
+
+   # Update the ring buffer, or we loose those frames
+   $self->_frames($frames);
+
+   # Check if we didn't received frames during $timeoutOnNext seconds, 
+   my $endTime = gettimeofday();
+   my $diff = $endTime - $thisTime;
+   if (! $some_received) {
+      $self->_timeWithoutReceiving($self->_timeWithoutReceiving + $diff);
+   }
+   else {
+      $self->_timeWithoutReceiving(0);
    }
 
-   # If we are here, a timeout has occured
-   $self->_nextTimeoutHandle;
+   #print STDERR "*** diff [$diff] received [$some_received] thisTime [$thisTime] endTime [$endTime]\n";
+
+   if ($self->_timeWithoutReceiving > $self->timeoutOnNext) {
+      #print STDERR "*** Timeout occured\n";
+      $self->timeout(1);
+   }
+
+   # Check if maximum run time has been reached
+   my $maxRunTime = $self->maxRunTime;
+   my $startTime = $self->_startTime;
+   if ($maxRunTime && ($endTime - $startTime) > $startTime) {
+      #print STDERR "*** Max running time reached\n";
+      $self->timeout(1);
+   }
 
    return;
 }
@@ -451,7 +491,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2014, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.

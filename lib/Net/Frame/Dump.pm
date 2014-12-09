@@ -1,11 +1,11 @@
 #
-# $Id: Dump.pm 360 2012-12-02 14:44:41Z gomor $
+# $Id: Dump.pm 364 2014-11-30 11:26:27Z gomor $
 #
 package Net::Frame::Dump;
 use strict;
 use warnings;
 
-our $VERSION = '1.13';
+our $VERSION = '1.14';
 
 use base qw(Class::Gomor::Array Exporter);
 
@@ -163,8 +163,8 @@ sub nextEx {
 
    my %hdr;
    my $raw;
-   my $r;
-   if ($r = Net::Pcap::next_ex($self->_pcapd, \%hdr, \$raw) > 0) {
+   my $r = Net::Pcap::next_ex($self->_pcapd, \%hdr, \$raw);
+   if ($r > 0) {
       my $ts = $self->keepTimestamp ? $self->_getTimestamp(\%hdr)
                                     : $self->_setTimestamp;
       return {
@@ -252,7 +252,7 @@ Patrice E<lt>GomoRE<gt> Auffret
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006-2012, Patrice E<lt>GomoRE<gt> Auffret
+Copyright (c) 2006-2014, Patrice E<lt>GomoRE<gt> Auffret
 
 You may distribute this module under the terms of the Artistic license.
 See LICENSE.Artistic file in the source distribution archive.
